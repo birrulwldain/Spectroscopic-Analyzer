@@ -45,6 +45,34 @@ def run_full_analysis(input_data: dict):
         niter = input_data.get("niter", 10)
         spectrum_data = spectrum_data - als_baseline_correction(spectrum_data, lam, p, niter)
 
+    # Tambahan: Inversi Abel (metode 'basex') untuk mendapatkan profil radial dari satu baris data
+    radial_profile = None
+    radial_profile_error = None
+    try:
+        # Import lokal agar aplikasi tidak gagal saat pyabel belum terpasang
+        import abel
+        # Ambil satu baris data: jika 2D, gunakan baris tengah; jika 1D, gunakan langsung
+        line_data = spectrum_data
+        if isinstance(line_data, np.ndarray) and line_data.ndim == 2:
+            line_data = line_data[line_data.shape[0] // 2, :]
+        line = np.asarray(line_data, dtype=float).ravel()
+        # Pastikan panjang ganjil (beberapa implementasi prefer origin di tengah)
+        if line.size % 2 == 0 and line.size > 2:
+            line = line[:-1]
+        # Bentuk citra 2D sederhana dengan menduplikasi baris untuk memenuhi kebutuhan Transform 2D
+        n = line.size
+        if n >= 3:
+            img = np.tile(line, (n, 1))
+            T = abel.Transform(img, method='basex', direction='inverse')
+            inv_img = T.transform
+            radial_profile = inv_img[n // 2, :].astype(float).tolist()
+        else:
+            radial_profile_error = "Data terlalu pendek untuk inversi Abel"
+    except Exception as e:
+        # Jangan crash; simpan pesan error agar bisa ditampilkan jika diperlukan
+        radial_profile = None
+        radial_profile_error = str(e)
+
     peak_indices, _ = find_peaks(
         spectrum_data,
         prominence=input_data.get("prominence"),
@@ -135,6 +163,8 @@ def run_full_analysis(input_data: dict):
         "prediction_table": prediction_table,
         "validation_table": validation_table,
         "summary_metrics": summary_metrics,
+    "radial_profile": radial_profile,
+    "radial_profile_error": radial_profile_error,
     }
 
 
@@ -165,6 +195,7 @@ class MainWindow(QMainWindow):
         self.current_peaks_wl = None
         self.current_peaks_int = None
         self.region = None
+        self._region_proxy = None  # debounce handler untuk region
 
         self.worker_thread = QThread(self)
         self.worker = Worker()
@@ -251,19 +282,58 @@ class MainWindow(QMainWindow):
         root_layout.addWidget(right_container)
         self.setCentralWidget(root)
 
+    def parse_asc_content(self, text: str) -> np.ndarray:
+        rows = []
+        for raw in text.splitlines():
+            line = raw.strip()
+            if not line or line.startswith(("#", "//", "%", ";")):
+                continue
+            line = line.replace(",", " ")
+            parts = [p for p in line.split() if p]
+            if len(parts) < 2:
+                continue
+            try:
+                x = float(parts[0]); y = float(parts[1])
+                rows.append((x, y))
+            except ValueError:
+                continue
+        if not rows:
+            raise ValueError("Tidak menemukan pasangan data numerik (x y).")
+        return np.asarray(rows, dtype=float)
+
     def open_file_dialog(self):
-        filename, _ = QFileDialog.getOpenFileName(self, "Buka File ASC", "", "ASC Files (*.asc)")
+        filename, _ = QFileDialog.getOpenFileName(self, "Buka File ASC", "", "ASC Files (*.asc);;All Files (*)")
         if filename:
-            with open(filename, 'r', encoding='utf-8') as f:
-                self.raw_asc_content = f.read()
-            self.status_label.setText(f"File: {filename.split('/')[-1]}")
+            encodings = ["utf-8", "utf-16", "latin-1"]
+            last_err = None
+            self.raw_asc_content = None
+            for enc in encodings:
+                try:
+                    with open(filename, 'r', encoding=enc, errors="strict") as f:
+                        self.raw_asc_content = f.read()
+                    break
+                except Exception as e:
+                    last_err = e
+            if self.raw_asc_content is None:
+                self.status_label.setText(f"Gagal membaca file: {last_err}")
+                return
+
+            base = os.path.basename(filename)
+            self.status_label.setText(f"File: {base}")
             self.last_results = None; self.export_button.setEnabled(False)
-            data = np.array([list(map(float, line.split())) for line in self.raw_asc_content.strip().split('\n') if len(line.split()) == 2])
+
+            try:
+                data = self.parse_asc_content(self.raw_asc_content)
+            except Exception as e:
+                self.table_widget.clear(); self.table_widget.setRowCount(0)
+                self.plot_widget.clear(); self.zoom_plot_widget.clear()
+                self.status_label.setText(f"Format file tidak valid: {e}")
+                return
             self.current_wavelengths = data[:, 0]; self.current_intensities = data[:, 1]
             self.current_peaks_wl = None; self.current_peaks_int = None
             self.plot_widget.clear(); self.zoom_plot_widget.clear(); self.table_widget.clear(); self.table_widget.setRowCount(0)
             self.plot_widget.plot(self.current_wavelengths, self.current_intensities, pen=pg.mkPen('k', width=0.5))
-            self.plot_widget.setTitle(f"Pratinjau Sinyal: {filename.split('/')[-1]}")
+            self.plot_widget.setTitle(f"Pratinjau Sinyal: {base}")
             self.ensure_zoom_region(float(np.min(self.current_wavelengths)), float(np.max(self.current_wavelengths)))
             self.on_region_changed()
 
@@ -383,9 +453,11 @@ class MainWindow(QMainWindow):
             width = (xmax - xmin)
             start = xmin + 0.25 * width
             end = xmin + 0.55 * width
+            # Gunakan orientasi vertical string dan debounce sinyal region
             self.region = pg.LinearRegionItem(values=(start, end), orientation='vertical', movable=True)
             self.region.setBounds([xmin, xmax])
-            self.region.sigRegionChanged.connect(self.on_region_changed)
+            # Debounce: batasi frekuensi callback saat drag (maks ~30 Hz)
+            self._region_proxy = pg.SignalProxy(self.region.sigRegionChanged, rateLimit=30, slot=lambda _: self.on_region_changed())
             self.plot_widget.addItem(self.region)
         else:
             self.region.setBounds([xmin, xmax])
