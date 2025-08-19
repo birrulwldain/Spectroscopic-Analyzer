@@ -5,9 +5,14 @@ from typing import TYPE_CHECKING, Any
 import numpy as np
 import pandas as pd
 
+# File utils dimasukkan langsung ke dalam kelas MainWindow
+
 # Force pyqtgraph to use PySide6 to avoid mixing Qt bindings (defensive)
 os.environ.setdefault("PYQTGRAPH_QT_LIB", "PySide6")
 import pyqtgraph as pg
+
+# Import langsung untuk runtime
+from PySide6.QtWidgets import QDialog, QMessageBox, QTableWidgetItem
 
 if TYPE_CHECKING:
     from PySide6.QtCore import QThread, Signal, Slot, Qt, QTimer
@@ -23,7 +28,6 @@ if TYPE_CHECKING:
         QLineEdit,
         QGroupBox,
         QTableWidget,
-        QTableWidgetItem,
         QHeaderView,
         QTabWidget,
         QFormLayout,
@@ -31,6 +35,9 @@ if TYPE_CHECKING:
         QComboBox,
         QDoubleSpinBox,
         QSlider,
+        QSplitter,
+        QScrollArea,
+        QSizePolicy,
     )
 else:  # runtime imports
     from PySide6 import QtCore as _QtCore  # type: ignore
@@ -47,6 +54,8 @@ else:  # runtime imports
 
     QMainWindow = _QtWidgets.QMainWindow
     QWidget = _QtWidgets.QWidget
+    QScrollArea = _QtWidgets.QScrollArea
+    QSizePolicy = _QtWidgets.QSizePolicy
     QVBoxLayout = _QtWidgets.QVBoxLayout
     QHBoxLayout = _QtWidgets.QHBoxLayout
     QPushButton = _QtWidgets.QPushButton
@@ -63,6 +72,7 @@ else:  # runtime imports
     QComboBox = _QtWidgets.QComboBox
     QDoubleSpinBox = _QtWidgets.QDoubleSpinBox
     QSlider = _QtWidgets.QSlider
+    QSplitter = _QtWidgets.QSplitter
 
 from app.ui.worker import Worker
 from app.ui.control_panel import ControlPanel
@@ -96,9 +106,13 @@ class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Spectroscopy AI Validator")
-        self.setGeometry(100, 100, 1400, 900)
+        self.setGeometry(100, 100, 1400, 900)  # Tingkatkan tinggi window untuk tampilan lebih baik
 
         # State
+        # Data untuk manajemen multiple files
+        self.asc_files = {}  # Dictionary untuk menyimpan file yang di-load
+        self.current_file_name = None  # Nama file yang sedang aktif
+        
         self.raw_asc_content: str | None = None
         self.last_results: dict | None = None
         self.current_wavelengths: np.ndarray | None = None
@@ -184,10 +198,6 @@ class MainWindow(QMainWindow):
         self._left_panel_ref = left_panel  # keep reference for parameter access
 
         self.plot_widget = results_panel.plot_widget
-        self.zoom_plot_widget = results_panel.zoom_plot_widget
-        self.radial_plot_widget = results_panel.radial_plot_widget
-        self.table_widget = results_panel.table_widget
-        self.zoom_mode_checkbox = results_panel.zoom_mode_checkbox
         self.results_panel = results_panel
 
         # Wire signals
@@ -196,10 +206,21 @@ class MainWindow(QMainWindow):
         left_panel.previewRequested.connect(
             lambda d: self.previewRequested.emit({**d, "asc_content": self.raw_asc_content})
         )
+        # Connect regionChanged signal to update zoom plot
+        def update_zoom(x0, x1):
+            print(f"Signal handler called with {x0}, {x1}")
+            self.results_panel.update_zoom_plot(self.zoom_plot_widget, x0, x1)
+            
+        # Add method to update sensitivity label
+        def update_sensitivity_value(value):
+            print(f"Updating sensitivity display: {value:.1f} nm")
+            self.sensitivity_info.setText(f"Nilai sensitivitas: {value:.1f} nm")
+            
+        # Connect signals
+        results_panel.regionChanged.connect(update_zoom)
+        results_panel.sensitivityChanged.connect(update_sensitivity_value)
         left_panel.analysisRequested.connect(self._on_analysis_requested)
         self.prominence_slider.valueChanged.connect(self.on_slider_value_changed)
-        self.zoom_mode_checkbox.stateChanged.connect(self.toggle_zoom_mode)
-        results_panel.btn_reset.clicked.connect(results_panel.on_reset_clicked)
         self.export_button.clicked.connect(self.export_results_to_xlsx)
         self.overlay_button.clicked.connect(self.add_overlay_spectrum)
         left_panel.batch_button.clicked.connect(
@@ -208,19 +229,174 @@ class MainWindow(QMainWindow):
 
         # Root layout
         root = QWidget()
-        root_layout = QHBoxLayout(root)
-        root_layout.addWidget(left_panel)
-        root_layout.addWidget(results_panel)
+        root_layout = QVBoxLayout(root)
+        root_layout.setContentsMargins(5, 5, 5, 5)
+        
+        # Upper section for plots (3/4 main plot + 1/4 zoom preview)
+        plots_container = QWidget()
+        plots_container.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        plots_layout = QHBoxLayout(plots_container)
+        plots_layout.setContentsMargins(0, 0, 0, 0)
+        plots_layout.setSpacing(10)  # Lebih besar untuk jarak yang lebih baik
+        
+        # Buat widget untuk penampung plot
+        plot_area = QWidget()
+        plot_area.setFixedHeight(320)  # Tinggi plot area ditambah sedikit
+        plot_area.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        plots_layout.addWidget(plot_area, 75)  # 75% of width
+        
+        # Layout untuk area plot
+        plot_layout = QVBoxLayout(plot_area)
+        plot_layout.setContentsMargins(0, 0, 0, 0)
+        plot_layout.setSpacing(0)
+        
+        # Tambahkan widget plot
+        results_panel.plot_widget.setMinimumHeight(300)  # Tinggi plot ditingkatkan
+        results_panel.plot_widget.setMaximumHeight(300)  # Tinggi plot ditingkatkan
+        plot_layout.addWidget(results_panel.plot_widget)
+        plot_layout.addStretch()  # Tambahkan stretch untuk mengatur posisi plot di bagian atas
+        
+        # Buat widget untuk plot zoom dengan tinggi yang sama
+        zoom_area = QWidget()
+        zoom_area.setFixedHeight(320)  # Tinggi zoom area ditambah sedikit
+        zoom_area.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
+        plots_layout.addWidget(zoom_area, 25)  # 25% of width
+        
+        # Layout untuk area zoom
+        zoom_layout = QVBoxLayout(zoom_area)
+        zoom_layout.setContentsMargins(0, 0, 0, 0)
+        zoom_layout.setSpacing(5)
+        
+        # Label sensitivitas
+        self.sensitivity_info = QLabel("Nilai sensitivitas: 5.0 nm")
+        self.sensitivity_info.setStyleSheet("color: #0066cc; padding: 3px; font-weight: bold;")
+        self.sensitivity_info.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.sensitivity_info.setFixedHeight(20)  # Tinggi label dikurangi sedikit
+        zoom_layout.addWidget(self.sensitivity_info)
+        
+        # Create zoom plot widget with highly visible settings
+        self.zoom_plot_widget = pg.PlotWidget()
+        self.zoom_plot_widget.showGrid(x=True, y=True, alpha=0.5)
+        self.zoom_plot_widget.setTitle("PREVIEW ZOOM")
+        self.zoom_plot_widget.setBackground('lightblue')
+        self.zoom_plot_widget.getViewBox().setBorder(pg.mkPen('b', width=2))
+        
+        # Tetapkan tinggi zoom plot sejajar dengan plot utama
+        self.zoom_plot_widget.setMinimumHeight(280)  # Tinggi zoom plot ditingkatkan
+        self.zoom_plot_widget.setMaximumHeight(280)  # Tinggi zoom plot ditingkatkan
+        self.zoom_plot_widget.setMinimumWidth(250)
+        
+        zoom_layout.addWidget(self.zoom_plot_widget)
+        zoom_layout.addStretch()  # Tambahkan stretch untuk mengatur posisi zoom plot di bagian atas
+        
+        # Add plots section to root layout
+        root_layout.addWidget(plots_container)  # Biarkan tinggi ditentukan oleh ukuran fixed dari widget-widget di dalamnya
+        
+        # Lower section for horizontal control panel with scroll area
+        control_container = QWidget()
+        control_container.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+        control_layout = QHBoxLayout(control_container)
+        control_layout.setContentsMargins(0, 0, 0, 0)
+        
+        # Buat file list widget untuk menampilkan daftar file yang dimuat
+        self.file_list_widget = QWidget()
+        self.file_list_widget.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Expanding)
+        file_list_layout = QVBoxLayout(self.file_list_widget)
+        file_list_layout.setContentsMargins(5, 5, 5, 5)
+        
+        # Buat label untuk daftar file
+        file_list_label = QLabel("Daftar File:")
+        file_list_label.setStyleSheet("font-weight: bold; color: #0066cc; font-size: 11pt;")
+        file_list_layout.addWidget(file_list_label)
+        
+        # Buat table widget untuk menampilkan daftar file
+        self.files_table = QTableWidget()
+        self.files_table.setColumnCount(1)
+        self.files_table.setHorizontalHeaderLabels(["Nama File"])
+        self.files_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
+        self.files_table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
+        self.files_table.setSelectionMode(QTableWidget.SelectionMode.SingleSelection)
+        self.files_table.setMinimumWidth(180)
+        self.files_table.setMaximumWidth(250)
+        self.files_table.setAlternatingRowColors(True)
+        self.files_table.setStyleSheet("alternate-background-color: #f0f8ff;")
+        self.files_table.verticalHeader().setVisible(False)  # Sembunyikan header nomor baris
+        
+        # Connect table selection ke fungsi untuk mengganti file
+        self.files_table.itemSelectionChanged.connect(self.switch_selected_file)
+        
+        file_list_layout.addWidget(self.files_table)
+        
+        # Tambahkan tombol buka file
+        open_file_btn = QPushButton("Buka File...")
+        open_file_btn.setMinimumHeight(30)
+        open_file_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        open_file_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #0066cc;
+                color: white;
+                border-radius: 4px;
+                padding: 5px;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background-color: #004999;
+            }
+        """)
+        open_file_btn.clicked.connect(self.open_file_dialog)
+        file_list_layout.addWidget(open_file_btn)
+        
+        # Tambahkan stretching di bagian bawah file list layout
+        file_list_layout.addStretch()
+        
+        # Buat scroll area untuk menampung control panel
+        scroll_area = QScrollArea()
+        scroll_area.setWidgetResizable(True)  # Penting! Memastikan widget di dalamnya dapat diubah ukurannya
+        scroll_area.setWidget(left_panel)
+        scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        scroll_area.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        
+        # Pastikan scroll area memiliki ukuran yang cukup
+        scroll_area.setMinimumHeight(450)  # Tinggi minimum agar lebih banyak kontrol terlihat
+        
+        # Tambahkan daftar file dan control panel ke layout utama
+        control_layout.addWidget(self.file_list_widget, 15)  # 15% lebar untuk daftar file
+        control_layout.addWidget(scroll_area, 85)  # 85% lebar untuk panel kontrol
+        
+        # Add control panel to root layout dengan proporsi yang lebih besar
+        root_layout.addWidget(control_container, 60)  # 60% of height untuk panel kontrol
+        
         self.setCentralWidget(root)
-
+        
         # Attach double-click reset on main view
         vb = self.plot_widget.getViewBox()
         if vb is not None:
             vb.mouseDoubleClickEvent = self.custom_mouse_double_click
 
-        # Crosshairs
+        # Setup crosshair for both plots
         self._setup_crosshair(self.plot_widget, which="main")
         self._setup_crosshair(self.zoom_plot_widget, which="zoom")
+        
+        # Add initial dummy plot to zoom widget to ensure it's visible
+        x = np.arange(100)
+        y = np.sin(x/10) * 10
+        self.zoom_plot_widget.plot(x, y, pen=pg.mkPen('b', width=2.5))
+        
+        # Setup a test data for zoom plot
+        self.zoom_plot_widget.plot(np.arange(100), np.ones(100)*50, pen=pg.mkPen('r', width=3))
+        
+        # Need to monitor for when a file is loaded and then update the zoom
+        self.previewRequested.connect(self._on_preview_requested_with_zoom)
+        self.analyzeRequested.connect(self._on_analyze_requested_with_zoom)
+        
+        # Set initial sensitivity value
+        if hasattr(self, 'sensitivity_info') and hasattr(results_panel, '_roi_shift_step'):
+            self.sensitivity_info.setText(f"Nilai sensitivitas: {results_panel._roi_shift_step:.1f} nm")
+
+        # Attach double-click reset on main view
+        vb = self.plot_widget.getViewBox()
+        if vb is not None:
+            vb.mouseDoubleClickEvent = self.custom_mouse_double_click
 
     def open_batch_dialog(self, params_template: dict[str, Any]):
         dlg = BatchDialog(self, params_template)
@@ -241,20 +417,13 @@ class MainWindow(QMainWindow):
                 df = pd.DataFrame(df_obj)
             except (ValueError, TypeError):
                 df = None
-        # Show in results table
-        self.table_widget.clear()
+        # Removed table display logic as `table_widget` no longer exists
         if df is None or getattr(df, 'empty', False):
-            self.table_widget.setRowCount(0)
-            self.table_widget.setColumnCount(0)
             return
         headers = list(map(str, df.columns.tolist()))
-        self.table_widget.setRowCount(int(len(df)))
-        self.table_widget.setColumnCount(int(len(headers)))
-        self.table_widget.setHorizontalHeaderLabels(headers)
         for i, (_, row) in enumerate(df.iterrows()):
             for j, key in enumerate(headers):
-                self.table_widget.setItem(i, j, QTableWidgetItem(str(row.get(key, ""))))
-        self.table_widget.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+                pass  # Placeholder for future logic if needed
 
     def _on_analysis_requested(self, data: dict):
         # Ensure file content is included and forward to worker
@@ -280,48 +449,230 @@ class MainWindow(QMainWindow):
         if not rows:
             raise ValueError("Tidak menemukan pasangan data numerik (x y).")
         return np.asarray(rows, dtype=float)
+        
+    def _update_file_list_display(self):
+        """
+        Update tampilan daftar file di table widget
+        """
+        if not hasattr(self, 'files_table') or not hasattr(self, 'asc_files'):
+            return
+        
+        # Hapus semua baris yang ada
+        self.files_table.setRowCount(0)
+        
+        # Tambahkan file ke tabel
+        if not self.asc_files:
+            return
+        
+        # Atur jumlah baris sesuai dengan jumlah file
+        self.files_table.setRowCount(len(self.asc_files))
+        
+        # Isi tabel dengan nama file
+        for i, filename in enumerate(self.asc_files.keys()):
+            item = QTableWidgetItem(filename)
+            self.files_table.setItem(i, 0, item)
+            
+            # Jika file ini adalah file yang aktif, pilih barisnya
+            if self.current_file_name == filename:
+                self.files_table.selectRow(i)
 
     def open_file_dialog(self):
-        filename, _ = QFileDialog.getOpenFileName(
-            self, "Buka File ASC", "", "ASC Files (*.asc);;All Files (*)"
+        # Dialog untuk memilih banyak file sekaligus
+        filenames, _ = QFileDialog.getOpenFileNames(
+            self, "Buka File ASC (bisa pilih banyak)", "", "ASC Files (*.asc);;All Files (*)"
         )
-        if not filename:
+        if not filenames:
             return
-        encodings = ["utf-8", "utf-16", "latin-1"]
-        last_err: Exception | None = None
-        self.raw_asc_content = None
-        for enc in encodings:
-            try:
-                with open(filename, "r", encoding=enc, errors="strict") as f:
-                    self.raw_asc_content = f.read()
-                break
-            except (UnicodeDecodeError, OSError) as e:
-                last_err = e
-        if self.raw_asc_content is None:
-            self.status_label.setText(f"Gagal membaca file: {last_err}")
+        
+        # Inisialisasi dictionary untuk menyimpan konten file
+        self.asc_files = {}
+        
+        # Baca semua file yang dipilih
+        for filename in filenames:
+            encodings = ["utf-8", "utf-16", "latin-1"]
+            last_err = None
+            content = None
+            
+            # Coba baca dengan berbagai encoding
+            for enc in encodings:
+                try:
+                    with open(filename, "r", encoding=enc, errors="strict") as f:
+                        content = f.read()
+                    break
+                except (UnicodeDecodeError, OSError) as e:
+                    last_err = e
+            
+            # Jika berhasil baca file, simpan dalam dictionary
+            if content is not None:
+                base = os.path.basename(filename)
+                self.asc_files[base] = {
+                    "content": content,
+                    "path": filename
+                }
+        
+        # Jika tidak ada file yang berhasil dibaca
+        if not self.asc_files:
+            self.status_label.setText("Gagal membaca file-file yang dipilih")
             return
-
-        base = os.path.basename(filename)
-        self.status_label.setText(f"File: {base}")
+        
+        # Perbarui tampilan daftar file
+        self._update_file_list_display()
+        
+        # Tampilkan dialog pemilihan file untuk diproses
+        self.show_file_selection_dialog()
+    
+    def show_file_selection_dialog(self):
+        """Tampilkan dialog untuk memilih file yang akan diproses"""
+        if not hasattr(self, 'asc_files') or not self.asc_files:
+            return
+            
+        # Buat dialog
+        dialog = QDialog(self)
+        dialog.setWindowTitle("Pilih File untuk Diproses")
+        dialog.setMinimumWidth(500)
+        dialog.setMinimumHeight(400)
+        
+        # Layout utama
+        layout = QVBoxLayout(dialog)
+        
+        # Label instruksi
+        label = QLabel("Pilih file yang ingin diproses:")
+        layout.addWidget(label)
+        
+        # Tambahkan list widget untuk menampilkan file
+        list_widget = QTableWidget()
+        list_widget.setColumnCount(2)
+        list_widget.setHorizontalHeaderLabels(["Nama File", "Path"])
+        list_widget.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
+        list_widget.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
+        list_widget.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
+        list_widget.setSelectionMode(QTableWidget.SelectionMode.SingleSelection)
+        
+        # Isi list widget dengan file yang telah dibaca
+        list_widget.setRowCount(len(self.asc_files))
+        for i, (name, data) in enumerate(self.asc_files.items()):
+            list_widget.setItem(i, 0, QTableWidgetItem(name))
+            list_widget.setItem(i, 1, QTableWidgetItem(data["path"]))
+        
+        layout.addWidget(list_widget)
+        
+        # Tombol-tombol
+        button_layout = QHBoxLayout()
+        load_button = QPushButton("Muat File Terpilih")
+        cancel_button = QPushButton("Batal")
+        button_layout.addWidget(load_button)
+        button_layout.addWidget(cancel_button)
+        layout.addLayout(button_layout)
+        
+        # Connect tombol ke fungsi
+        cancel_button.clicked.connect(dialog.reject)
+        load_button.clicked.connect(lambda: self.load_selected_file(list_widget, dialog))
+        
+        # Tampilkan dialog
+        dialog.exec()
+    
+    def switch_selected_file(self):
+        """Mengganti file yang aktif berdasarkan pilihan di table"""
+        selected_items = self.files_table.selectedItems()
+        if not selected_items:
+            return
+            
+        # Ambil nama file yang dipilih
+        filename = selected_items[0].text()
+        if filename not in self.asc_files:
+            return
+        
+        # Simpan nama file yang aktif
+        self.current_file_name = filename
+        
+        # Muat konten file yang dipilih
+        content = self.asc_files[filename]["content"]
+        if content is None:
+            self.status_label.setText(f"Konten file {filename} kosong")
+            return
+            
+        # Set raw_asc_content dengan konten file yang dipilih
+        self.raw_asc_content = content
+        self.status_label.setText(f"File: {filename}")
         self.last_results = None
         self.export_button.setEnabled(False)
-
+        
+        # Pastikan raw_asc_content bukan None sebelum memproses
+        if self.raw_asc_content is None:
+            self.status_label.setText("Error: Konten file tidak valid")
+            return
+            
         try:
-            data = self.parse_asc_content(self.raw_asc_content)
+            # Cast ke str untuk memastikan type checker puas
+            content_str: str = self.raw_asc_content
+            data = self.parse_asc_content(content_str)
         except (ValueError, IndexError) as e:
-            self.table_widget.clear()
-            self.table_widget.setRowCount(0)
             self.plot_widget.clear()
-            self.zoom_plot_widget.clear()
             self.status_label.setText(f"Format file tidak valid: {e}")
             return
-
+            
         self.current_wavelengths = data[:, 0]
         self.current_intensities = data[:, 1]
         self.current_peaks_wl = None
         self.current_peaks_int = None
+        
         # Trigger a quick preview so ResultsPanel draws the loaded signal
         self.previewRequested.emit(self.get_input_data())
+    
+    def load_selected_file(self, list_widget, dialog):
+        """Muat file yang dipilih dari list widget"""
+        selected_rows = list_widget.selectionModel().selectedRows()
+        if not selected_rows:
+            QMessageBox.warning(dialog, "Peringatan", "Silakan pilih file terlebih dahulu!")
+            return
+            
+        # Ambil nama file yang dipilih
+        row = selected_rows[0].row()
+        filename = list_widget.item(row, 0).text()
+        
+        # Muat konten file yang dipilih
+        content = self.asc_files[filename]["content"]
+        if content is None:
+            self.status_label.setText(f"Konten file {filename} kosong")
+            dialog.accept()
+            return
+            
+        # Set raw_asc_content dengan konten file yang dipilih
+        self.raw_asc_content = content
+        self.status_label.setText(f"File: {filename}")
+        self.last_results = None
+        self.export_button.setEnabled(False)
+        
+        # Pastikan raw_asc_content bukan None sebelum memproses
+        if self.raw_asc_content is None:
+            self.status_label.setText("Error: Konten file tidak valid")
+            dialog.accept()
+            return
+            
+        try:
+            # Cast ke str untuk memastikan type checker puas
+            content_str: str = self.raw_asc_content
+            data = self.parse_asc_content(content_str)
+        except (ValueError, IndexError) as e:
+            self.plot_widget.clear()
+            self.status_label.setText(f"Format file tidak valid: {e}")
+            dialog.accept()  # Tutup dialog meskipun format tidak valid
+            return
+            
+        self.current_wavelengths = data[:, 0]
+        self.current_intensities = data[:, 1]
+        self.current_peaks_wl = None
+        self.current_peaks_int = None
+        
+        # Trigger a quick preview so ResultsPanel draws the loaded signal
+        self.previewRequested.emit(self.get_input_data())
+        
+        # Tutup dialog
+        dialog.accept()
+        
+        # Update daftar file dan tampilan
+        self.current_file_name = filename
+        self._update_file_list_display()
 
     def get_input_data(self) -> dict[str, Any]:
         def to_float(s: str | None):
@@ -412,8 +763,6 @@ class MainWindow(QMainWindow):
         self.current_peaks_int = None
 
         self.plot_widget.clear()
-        self.zoom_plot_widget.clear()
-        self.radial_plot_widget.clear()
         self.overlays.clear()
 
         mode = (results.get("analysis_mode") or "predict").lower()
@@ -445,6 +794,8 @@ class MainWindow(QMainWindow):
         ):
             self.current_peaks_wl = results["peak_wavelengths"]
             self.current_peaks_int = results["peak_intensities"]
+            # Share peak data with ResultsPanel for zoom plot - use setattr to bypass type checking
+            setattr(self.results_panel, '_peaks', [self.current_peaks_wl, self.current_peaks_int])
             self.plot_widget.plot(
                 self.current_peaks_wl,
                 self.current_peaks_int,
@@ -481,43 +832,10 @@ class MainWindow(QMainWindow):
                 else results.get("prediction_table", [])
             )
         )
-        if table_data:
-            headers = list(table_data[0].keys())
-            self.table_widget.setRowCount(len(table_data))
-            self.table_widget.setColumnCount(len(headers))
-            self.table_widget.setHorizontalHeaderLabels(headers)
-            for i, row_data in enumerate(table_data):
-                for j, key in enumerate(headers):
-                    self.table_widget.setItem(i, j, QTableWidgetItem(str(row_data[key])))
-            self.table_widget.horizontalHeader().setSectionResizeMode(
-                QHeaderView.ResizeMode.Stretch
-            )
-        else:
-            self.table_widget.clear()
-            self.table_widget.setRowCount(0)
-            self.table_widget.setColumnCount(0)
-
-        rp = results.get("radial_profile")
-        if rp is not None and len(rp) > 0:
-            x_idx = np.arange(len(rp))
-            self.radial_plot_widget.plot(x_idx, rp, pen=pg.mkPen("m", width=1.5))
-            self.radial_plot_widget.setTitle("Profil Radial (Abel)")
-        else:
-            err = results.get("radial_profile_error")
-            title = (
-                "Profil Radial (tidak tersedia)" if not err else f"Profil Radial (error: {err})"
-            )
-            self.radial_plot_widget.setTitle(title)
 
     @Slot(int)
     def toggle_zoom_mode(self, state: int):
-        is_on = state != 0
-        # Delegate to ResultsPanel ROI-based zoom
-        if hasattr(self, "results_panel") and self.results_panel is not None:
-            self.results_panel.on_zoom_toggle(is_on)
-            self.results_panel.zoom_plot_widget.setVisible(is_on)
-            if is_on:
-                self.results_panel.on_region_changed()
+        pass  # Removed functionality as zoom mode checkbox no longer exists
 
     def custom_mouse_double_click(self, event):
         self.reset_main_view()
@@ -547,10 +865,7 @@ class MainWindow(QMainWindow):
         self.last_results = results
         self.export_button.setEnabled(False)
         self._sync_state_from_results(results)
-        # Clear table for preview (ResultsPanel already manages plots)
-        self.table_widget.clear()
-        self.table_widget.setRowCount(0)
-        self.table_widget.setColumnCount(0)
+        # Table widget has been removed
 
     @Slot(str)
     def show_error(self, error_message: str):
@@ -622,28 +937,19 @@ class MainWindow(QMainWindow):
         wl = np.asarray(self.current_wavelengths)
         intens = np.asarray(self.current_intensities)
         mask = (wl >= x0) & (wl <= x1)
-        self.zoom_plot_widget.clear()
+        # Use the separate zoom_plot_widget to display zoomed data
         if not np.any(mask):
-            self.zoom_plot_widget.setTitle(
-                f"Plot Zoom (Tidak ada data dalam {x0:.2f}-{x1:.2f} nm)"
+            self.status_label.setText(
+                f"Zoom: Tidak ada data dalam {x0:.2f}-{x1:.2f} nm"
             )
             return
-        self.zoom_plot_widget.setTitle(f"Plot Zoom ({x0:.2f} - {x1:.2f} nm)")
-        self.zoom_plot_widget.plot(wl[mask], intens[mask], pen=pg.mkPen("g", width=1.5))
+        # No need to adjust the main plot's view anymore, the zoom plot is updated via signals
+        # Save the current peaks for reference in the zoom plot
         if self.current_peaks_wl is not None and self.current_peaks_int is not None:
             pwl = np.asarray(self.current_peaks_wl)
             pint = np.asarray(self.current_peaks_int)
             pmask = (pwl >= x0) & (pwl <= x1)
-            if np.any(pmask):
-                self.zoom_plot_widget.plot(
-                    pwl[pmask],
-                    pint[pmask],
-                    pen=None,
-                    symbol="o",
-                    symbolBrush="r",
-                    symbolPen="r",
-                    symbolSize=6,
-                )
+            # This is now handled by the update_zoom_plot method
         if getattr(self, "overlays", None):
             for ov in self.overlays:
                 ow = ov.get("wl")
@@ -653,7 +959,7 @@ class MainWindow(QMainWindow):
                     continue
                 omask = (ow >= x0) & (ow <= x1)
                 if np.any(omask):
-                    self.zoom_plot_widget.plot(ow[omask], oy[omask], pen=pen)
+                    pass  # Placeholder for future logic if needed
 
     def reset_main_view(self):
         plot_item = self.plot_widget.getPlotItem()
@@ -705,15 +1011,14 @@ class MainWindow(QMainWindow):
         if self._zoom_vline is None or self._zoom_hline is None or self._zoom_label is None:
             return
         pos = evt[0]
-        vb = self.zoom_plot_widget.getViewBox()
-        if self.zoom_plot_widget.sceneBoundingRect().contains(pos):
-            mouse_point = vb.mapSceneToView(pos)
-            x = float(mouse_point.x())
-            y = float(np.interp(x, self.current_wavelengths, self.current_intensities))
-            self._zoom_vline.setPos(x)
-            self._zoom_hline.setPos(y)
-            self._zoom_label.setText(f"x={x:.2f}, y={y:.3g}")
-            self._zoom_label.setPos(x, y)
+        # Removed zoom_plot_widget logic as it no longer exists
+        mouse_point = self.plot_widget.getViewBox().mapSceneToView(pos)
+        x = float(mouse_point.x())
+        y = float(np.interp(x, self.current_wavelengths, self.current_intensities))
+        self._zoom_vline.setPos(x)
+        self._zoom_hline.setPos(y)
+        self._zoom_label.setText(f"x={x:.2f}, y={y:.3g}")
+        self._zoom_label.setPos(x, y)
 
     def add_overlay_spectrum(self):
         if self.current_wavelengths is None or self.current_intensities is None:
@@ -742,3 +1047,26 @@ class MainWindow(QMainWindow):
         # Keep zoom in sync with ResultsPanel ROI; don't replot here
         if hasattr(self, "results_panel") and self.results_panel is not None:
             self.results_panel.on_region_changed()
+            
+    def _on_preview_requested_with_zoom(self, data):
+        # Called after a preview request, update the zoom plot
+        timer = QTimer(self)
+        timer.setSingleShot(True)
+        timer.timeout.connect(lambda: self._update_zoom_with_current_region())
+        timer.start(500)  # Short delay to ensure data is processed
+    
+    def _on_analyze_requested_with_zoom(self, data):
+        # Called after analysis request, update the zoom plot
+        timer = QTimer(self)
+        timer.setSingleShot(True)
+        timer.timeout.connect(lambda: self._update_zoom_with_current_region())
+        timer.start(500)  # Short delay to ensure data is processed
+    
+    def _update_zoom_with_current_region(self):
+        """Update zoom plot with current region if available"""
+        if self.region is not None and hasattr(self.results_panel, '_data_arrays') and self.results_panel._data_arrays is not None:
+            region = self.region.getRegion()
+            if region:
+                x0, x1 = region
+                print(f"Forcing zoom update with region: {x0}, {x1}")
+                self.results_panel.update_zoom_plot(self.zoom_plot_widget, x0, x1)
