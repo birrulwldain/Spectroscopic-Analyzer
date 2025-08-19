@@ -8,17 +8,26 @@ QObject = _QtCore.QObject
 Signal = _QtCore.Signal
 Slot = _QtCore.Slot
 
-from app.core.analysis import run_full_analysis
+from app.core.analysis import run_full_analysis, run_preprocessing
 
 
 class Worker(QObject):
-    finished = Signal(dict)
+    previewFinished = Signal(dict)
+    fullAnalysisFinished = Signal(dict)
     error = Signal(str)
 
     @Slot(dict)
-    def run_analysis(self, input_data: dict[str, Any]):
+    def run_preview(self, input_data: dict[str, Any]):
+        try:
+            results = run_preprocessing(input_data)
+            self.previewFinished.emit(results)
+        except (ValueError, RuntimeError) as e:
+            self.error.emit(f"Error: {e}\n{traceback.format_exc()}")
+
+    @Slot(dict)
+    def run_full(self, input_data: dict[str, Any]):
         try:
             results = run_full_analysis(input_data)
-            self.finished.emit(results)
+            self.fullAnalysisFinished.emit(results)
         except (ValueError, RuntimeError) as e:
             self.error.emit(f"Error: {e}\n{traceback.format_exc()}")

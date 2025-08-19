@@ -13,12 +13,17 @@ except (OSError, ValueError, RuntimeError, ImportError, FileNotFoundError):
     _MODEL, ELEMENT_MAP, TARGET_WAVELENGTHS = None, {}, np.array([], dtype=np.float32)
 
 
-def run_full_analysis(input_data: dict[str, Any]) -> dict[str, Any]:
+def run_preprocessing(input_data: dict[str, Any]) -> dict[str, Any]:
+    """Preprocessing only: parse ASC, shift wavelengths, resample if needed,
+    baseline correction, smoothing, normalization.
+
+    Returns at least: { 'wavelengths', 'spectrum_data' } and also 'baseline' for overlay.
+    """
     if not input_data.get("asc_content"):
         raise ValueError("ASC content kosong.")
 
     # Parse ASC text
-    rows = []
+    rows: list[tuple[float, float]] = []
     for raw in input_data["asc_content"].splitlines():
         line = raw.strip()
         if not line or line.startswith(("#", "//", "%", ";")):
@@ -34,6 +39,7 @@ def run_full_analysis(input_data: dict[str, Any]) -> dict[str, Any]:
             continue
     if not rows:
         raise ValueError("Tidak menemukan pasangan data numerik (x y).")
+
     arr = np.asarray(rows, dtype=float)
     arr = arr[np.argsort(arr[:, 0])]
     wavelengths = arr[:, 0].astype(np.float64)
@@ -44,30 +50,54 @@ def run_full_analysis(input_data: dict[str, Any]) -> dict[str, Any]:
     if shift_nm != 0.0:
         wavelengths = wavelengths + shift_nm
 
+    # Resample (optional)
     use_raw = bool(input_data.get("use_raw_resolution", True))
     if use_raw or TARGET_WAVELENGTHS.size == 0:
         used_wavelengths = wavelengths
         y = intensities.copy()
     else:
+        # Resample to target grid. Avoid filling with hard zeros outside bounds,
+        # as that can flatten the signal when zooming/normalizing.
         used_wavelengths = TARGET_WAVELENGTHS.astype(np.float64)
-        y = np.interp(used_wavelengths, wavelengths, intensities, left=0.0, right=0.0)
+        left_fill = float(intensities[0]) if intensities.size else 0.0
+        right_fill = float(intensities[-1]) if intensities.size else 0.0
+        y = np.interp(used_wavelengths, wavelengths, intensities, left=left_fill, right=right_fill)
 
+    # Baseline correction (optional)
     baseline = None
+    baseline_applied = False
+    baseline_warning = None
     if input_data.get("apply_baseline_correction"):
         lam = float(input_data.get("lam") or 1e5)
         p = float(input_data.get("p") or 0.01)
         niter = int(input_data.get("niter") or 10)
         try:
             baseline = als_baseline_correction(y, lam=lam, p=p, niter=niter)
-        except (ValueError, RuntimeError, TypeError):
+        except (ValueError, RuntimeError, TypeError) as e:
             baseline = None
+            baseline_warning = f"Baseline gagal: {e}"
 
     spectrum_data = y.copy()
     if baseline is not None:
-        spectrum_data = spectrum_data - baseline
-        spectrum_data = np.clip(spectrum_data, a_min=0.0, a_max=None)
+        raw = spectrum_data.copy()
+        corrected = raw - baseline
+        corrected = np.clip(corrected, a_min=0.0, a_max=None)
+        # If baseline removal wipes out nearly all signal, fall back to raw
+        # (common when params are too aggressive or baseline ~= signal).
+        try:
+            raw_span = float(np.nanmax(raw) - np.nanmin(raw)) if raw.size else 0.0
+            corr_span = float(np.nanmax(corrected) - np.nanmin(corrected)) if corrected.size else 0.0
+        except ValueError:
+            raw_span, corr_span = 0.0, 0.0
+        if raw_span > 0 and corr_span < 1e-6 * raw_span:
+            spectrum_data = raw
+            baseline_applied = False
+            baseline_warning = "Baseline diabaikan: hasil terlalu mendekati nol. Sesuaikan lam/p/niter."
+        else:
+            spectrum_data = corrected
+            baseline_applied = True
 
-    # Optional smoothing
+    # Smoothing (optional)
     if input_data.get("smoothing"):
         try:
             win = int(input_data.get("sg_window") or 11)
@@ -83,25 +113,66 @@ def run_full_analysis(input_data: dict[str, Any]) -> dict[str, Any]:
         except (ValueError, RuntimeError):
             pass
 
-    # Optional normalization
+    # Normalization (optional)
     norm = (input_data.get("normalization") or "None").lower()
     if norm == "max":
-        m = float(np.max(spectrum_data)) if len(spectrum_data) else 0.0
+        m = float(np.nanmax(spectrum_data)) if len(spectrum_data) else 0.0
         if m > 0:
             spectrum_data = spectrum_data / m
     elif norm == "area":
-        area = float(np.trapz(spectrum_data, used_wavelengths)) if len(spectrum_data) else 0.0
-        if abs(area) > 0:
+        # Use positive area to avoid cancellation; guard tiny areas
+        try:
+            pos = np.clip(spectrum_data, a_min=0.0, a_max=None)
+            area = float(np.trapz(pos, used_wavelengths)) if len(spectrum_data) else 0.0
+        except (TypeError, ValueError, FloatingPointError):
+            area = 0.0
+        if abs(area) > 1e-12:
             spectrum_data = spectrum_data / area
+
+    return {
+        "wavelengths": used_wavelengths,
+        "spectrum_data": spectrum_data,
+        "baseline": baseline,
+        "baseline_applied": baseline_applied,
+        "baseline_warning": baseline_warning,
+    }
+
+
+def run_peak_analysis(input_data: dict[str, Any], preprocessed_results: dict[str, Any]) -> dict[str, Any]:
+    """Peak detection, element mapping, annotations, validation, and optional Abel inversion.
+    Accepts preprocessed wavelengths & spectrum.
+    """
+    used_wavelengths = preprocessed_results["wavelengths"]
+    spectrum_data = preprocessed_results["spectrum_data"]
+    baseline = preprocessed_results.get("baseline")
 
     prominence = float(input_data.get("prominence") or 0.01)
     distance = int(input_data.get("distance") or 8)
     height = input_data.get("height")
     width = input_data.get("width")
     threshold = float(input_data.get("threshold") or 0.6)
-    peak_indices, _ = find_peaks(spectrum_data, prominence=prominence, distance=distance, height=height, width=width)
+    peak_indices, _ = find_peaks(
+        spectrum_data, prominence=prominence, distance=distance, height=height, width=width
+    )
     peak_wavelengths = used_wavelengths[peak_indices]
     peak_intensities = spectrum_data[peak_indices]
+
+    analysis_mode = (input_data.get("analysis_mode") or "predict").lower()
+    if analysis_mode == "preprocess":
+        return {
+            "analysis_mode": analysis_mode,
+            "spectrum_data": spectrum_data,
+            "wavelengths": used_wavelengths,
+            "peak_wavelengths": peak_wavelengths,
+            "peak_intensities": peak_intensities,
+            "annotations": [],
+            "prediction_table": [],
+            "validation_table": [],
+            "summary_metrics": {},
+            "baseline": baseline,
+            "radial_profile": None,
+            "radial_profile_error": None,
+        }
 
     # Map peaks to elements using nearest index on TARGET_WAVELENGTHS
     all_peaks_list = []
@@ -129,8 +200,8 @@ def run_full_analysis(input_data: dict[str, Any]) -> dict[str, Any]:
     sorted_peaks = sorted(all_peaks_list, key=lambda p: p['intensity'], reverse=True)
 
     annotations = []
-    element_rank_counter = {}
-    predicted_elements_with_locations = {}
+    element_rank_counter: dict[str, int] = {}
+    predicted_elements_with_locations: dict[str, list[float]] = {}
     for peak in sorted_peaks:
         label_parts = []
         is_top_peak_overall = False
@@ -153,7 +224,7 @@ def run_full_analysis(input_data: dict[str, Any]) -> dict[str, Any]:
 
     prediction_table = []
     validation_table = []
-    summary_metrics = {}
+    summary_metrics: dict[str, Any] = {}
     predicted_elements_set = set(predicted_elements_with_locations.keys())
     for el in sorted(predicted_elements_set):
         locs = predicted_elements_with_locations.get(el, [])
@@ -197,6 +268,7 @@ def run_full_analysis(input_data: dict[str, Any]) -> dict[str, Any]:
             radial_profile = None
 
     return {
+        "analysis_mode": analysis_mode,
         "spectrum_data": spectrum_data,
         "wavelengths": used_wavelengths,
         "peak_wavelengths": np.array([p['wavelength'] for p in sorted_peaks], dtype=np.float32),
@@ -209,3 +281,9 @@ def run_full_analysis(input_data: dict[str, Any]) -> dict[str, Any]:
         "radial_profile": radial_profile,
         "radial_profile_error": radial_profile_error,
     }
+
+
+def run_full_analysis(input_data: dict[str, Any]) -> dict[str, Any]:
+    """Orchestrates preprocessing and peak analysis."""
+    pre = run_preprocessing(input_data)
+    return run_peak_analysis(input_data, pre)

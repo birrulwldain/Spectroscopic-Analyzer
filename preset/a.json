@@ -1,0 +1,19 @@
+{
+  "prominence": 0.01,
+  "distance": 8,
+  "height": null,
+  "width": null,
+  "threshold": 0.6,
+  "use_raw_resolution": true,
+  "apply_baseline_correction": true,
+  "show_baseline_overlay": false,
+  "compute_abel": false,
+  "lam": 100000.0,
+  "p": 0.01,
+  "niter": 10,
+  "smoothing": true,
+  "sg_window": 11,
+  "sg_poly": 3,
+  "normalization": "Area",
+  "shift_nm": 0.0
+}
