@@ -327,7 +327,15 @@ class MainWindow(QMainWindow):
         
         file_list_layout.addWidget(self.files_table)
         
-        # Tambahkan tombol buka file
+        # Tambahkan label status jumlah file
+        self.file_count_label = QLabel("0 file dimuat")
+        self.file_count_label.setStyleSheet("color: #555; font-style: italic; font-size: 9pt;")
+        self.file_count_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        file_list_layout.addWidget(self.file_count_label)
+        
+        # Tambahkan tombol buka file dan folder
+        buttons_layout = QHBoxLayout()
+        
         open_file_btn = QPushButton("Buka File...")
         open_file_btn.setMinimumHeight(30)
         open_file_btn.setCursor(Qt.CursorShape.PointingHandCursor)
@@ -344,7 +352,27 @@ class MainWindow(QMainWindow):
             }
         """)
         open_file_btn.clicked.connect(self.open_file_dialog)
-        file_list_layout.addWidget(open_file_btn)
+        buttons_layout.addWidget(open_file_btn)
+        
+        open_folder_btn = QPushButton("Buka Folder...")
+        open_folder_btn.setMinimumHeight(30)
+        open_folder_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        open_folder_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #27ae60;
+                color: white;
+                border-radius: 4px;
+                padding: 5px;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background-color: #219653;
+            }
+        """)
+        open_folder_btn.clicked.connect(self.open_folder_dialog)
+        buttons_layout.addWidget(open_folder_btn)
+        
+        file_list_layout.addLayout(buttons_layout)
         
         # Tambahkan stretching di bagian bawah file list layout
         file_list_layout.addStretch()
@@ -462,19 +490,58 @@ class MainWindow(QMainWindow):
         
         # Tambahkan file ke tabel
         if not self.asc_files:
+            # Update status label jika ada
+            if hasattr(self, 'status_label'):
+                self.status_label.setText("Tidak ada file yang dimuat")
+            # Update file count label
+            if hasattr(self, 'file_count_label'):
+                self.file_count_label.setText("0 file dimuat")
             return
+        
+        # Update status label jika ada
+        file_count = len(self.asc_files)
+        if hasattr(self, 'status_label'):
+            self.status_label.setText(f"{file_count} file{'s' if file_count > 1 else ''} dimuat")
+        # Update file count label
+        if hasattr(self, 'file_count_label'):
+            if file_count == 1:
+                self.file_count_label.setText("1 file dimuat")
+            else:
+                self.file_count_label.setText(f"{file_count} file dimuat")
         
         # Atur jumlah baris sesuai dengan jumlah file
         self.files_table.setRowCount(len(self.asc_files))
         
-        # Isi tabel dengan nama file
-        for i, filename in enumerate(self.asc_files.keys()):
+        # Sortir berdasarkan nama file
+        sorted_files = sorted(self.asc_files.items())
+        
+        # Isi tabel dengan nama file yang sudah diurutkan
+        for i, (filename, file_data) in enumerate(sorted_files):
             item = QTableWidgetItem(filename)
+            
+            # Tambahkan tooltip dengan informasi file
+            try:
+                file_size = os.path.getsize(file_data["path"])
+                if file_size < 1024:
+                    size_str = f"{file_size} B"
+                elif file_size < 1024*1024:
+                    size_str = f"{file_size/1024:.1f} KB"
+                else:
+                    size_str = f"{file_size/(1024*1024):.1f} MB"
+                
+                item.setToolTip(f"Nama: {filename}\nUkuran: {size_str}\nPath: {file_data['path']}")
+            except:
+                item.setToolTip(f"Nama: {filename}\nPath: {file_data['path']}")
+            
             self.files_table.setItem(i, 0, item)
             
-            # Jika file ini adalah file yang aktif, pilih barisnya
+            # Jika file ini adalah file yang aktif, pilih barisnya dan highlight
             if self.current_file_name == filename:
                 self.files_table.selectRow(i)
+                item.setBackground(QColor(173, 216, 230))  # Light blue
+                font = item.font()
+                font.setBold(True)
+                item.setFont(font)
 
     def open_file_dialog(self):
         # Dialog untuk memilih banyak file sekaligus
@@ -484,6 +551,64 @@ class MainWindow(QMainWindow):
         if not filenames:
             return
         
+        # Proses file yang dipilih
+        self._process_selected_files(filenames)
+    
+    def open_folder_dialog(self):
+        # Dialog untuk memilih folder berisi file ASC
+        folder_path = QFileDialog.getExistingDirectory(
+            self, "Pilih Folder Berisi File ASC"
+        )
+        
+        if not folder_path:
+            return
+        
+        # Dialog untuk memilih opsi scanning subfolder
+        include_subfolders = False
+        result = QMessageBox.question(
+            self,
+            "Opsi Folder",
+            "Apakah Anda ingin mencari file ASC di subfolder juga?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+        )
+        if result == QMessageBox.StandardButton.Yes:
+            include_subfolders = True
+        
+        # Cari semua file ASC di dalam folder
+        asc_files = []
+        
+        if include_subfolders:
+            # Scan rekursif ke dalam semua subfolder
+            for root, _, files in os.walk(folder_path):
+                for file in files:
+                    if file.lower().endswith(".asc"):
+                        asc_files.append(os.path.join(root, file))
+        else:
+            # Hanya scan folder utama saja
+            for file in os.listdir(folder_path):
+                if file.lower().endswith(".asc"):
+                    asc_files.append(os.path.join(folder_path, file))
+        
+        if not asc_files:
+            QMessageBox.information(self, "Informasi", "Tidak ada file ASC yang ditemukan di folder ini.")
+            return
+        
+        # Tampilkan pesan jika banyak file ditemukan
+        if len(asc_files) > 10:
+            result = QMessageBox.question(
+                self, 
+                "Konfirmasi", 
+                f"Ditemukan {len(asc_files)} file ASC di folder{' dan subfolder' if include_subfolders else ''}. Lanjutkan memuat semua file?",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+            )
+            
+            if result == QMessageBox.StandardButton.No:
+                return
+            
+        # Proses file-file ASC yang ditemukan
+        self._process_selected_files(asc_files)
+    
+    def _process_selected_files(self, filenames):
         # Inisialisasi dictionary untuk menyimpan konten file
         self.asc_files = {}
         
@@ -529,36 +654,75 @@ class MainWindow(QMainWindow):
         # Buat dialog
         dialog = QDialog(self)
         dialog.setWindowTitle("Pilih File untuk Diproses")
-        dialog.setMinimumWidth(500)
-        dialog.setMinimumHeight(400)
+        dialog.setMinimumWidth(600)
+        dialog.setMinimumHeight(500)
         
         # Layout utama
         layout = QVBoxLayout(dialog)
         
         # Label instruksi
-        label = QLabel("Pilih file yang ingin diproses:")
+        label = QLabel(f"<b>Ditemukan {len(self.asc_files)} file ASC. Pilih file yang ingin diproses:</b>")
         layout.addWidget(label)
         
         # Tambahkan list widget untuk menampilkan file
         list_widget = QTableWidget()
-        list_widget.setColumnCount(2)
-        list_widget.setHorizontalHeaderLabels(["Nama File", "Path"])
-        list_widget.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
-        list_widget.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
+        list_widget.setColumnCount(3)  # Nama File, Ukuran, Path
+        list_widget.setHorizontalHeaderLabels(["Nama File", "Ukuran", "Lokasi File"])
+        list_widget.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
+        list_widget.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.ResizeToContents)
+        list_widget.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeMode.Stretch)
         list_widget.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
         list_widget.setSelectionMode(QTableWidget.SelectionMode.SingleSelection)
+        list_widget.setAlternatingRowColors(True)
+        list_widget.setStyleSheet("alternate-background-color: #f0f8ff;")
         
-        # Isi list widget dengan file yang telah dibaca
-        list_widget.setRowCount(len(self.asc_files))
-        for i, (name, data) in enumerate(self.asc_files.items()):
+        # Sortir daftar file berdasarkan nama file
+        sorted_files = sorted(self.asc_files.items())
+        
+        # Isi list widget dengan file yang telah dibaca dan diurutkan
+        list_widget.setRowCount(len(sorted_files))
+        for i, (name, data) in enumerate(sorted_files):
             list_widget.setItem(i, 0, QTableWidgetItem(name))
-            list_widget.setItem(i, 1, QTableWidgetItem(data["path"]))
+            
+            # Tambahkan informasi ukuran file
+            try:
+                file_size = os.path.getsize(data["path"])
+                if file_size < 1024:
+                    size_str = f"{file_size} B"
+                elif file_size < 1024*1024:
+                    size_str = f"{file_size/1024:.1f} KB"
+                else:
+                    size_str = f"{file_size/(1024*1024):.1f} MB"
+                list_widget.setItem(i, 1, QTableWidgetItem(size_str))
+            except:
+                list_widget.setItem(i, 1, QTableWidgetItem("N/A"))
+                
+            list_widget.setItem(i, 2, QTableWidgetItem(data["path"]))
         
         layout.addWidget(list_widget)
+        
+        # Tambahkan informasi
+        info_label = QLabel("<i>Klik dua kali pada file untuk langsung memuat, atau gunakan tombol di bawah.</i>")
+        layout.addWidget(info_label)
+        
+        # Connect double-click untuk langsung memuat file
+        list_widget.itemDoubleClicked.connect(lambda: self.load_selected_file(list_widget, dialog))
         
         # Tombol-tombol
         button_layout = QHBoxLayout()
         load_button = QPushButton("Muat File Terpilih")
+        load_button.setStyleSheet("""
+            QPushButton {
+                background-color: #0066cc;
+                color: white;
+                padding: 8px 12px;
+                border-radius: 4px;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background-color: #004999;
+            }
+        """)
         cancel_button = QPushButton("Batal")
         button_layout.addWidget(load_button)
         button_layout.addWidget(cancel_button)
