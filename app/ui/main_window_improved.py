@@ -177,8 +177,7 @@ class MainWindow(QMainWindow):
         self.gt_input = left_panel.gt_input
         self.predict_tab_index = left_panel.predict_tab_index
         self.validate_tab_index = left_panel.validate_tab_index
-        self.prominence_slider = left_panel.prominence_slider
-        self.prominence_label = left_panel.prominence_label
+        self.prominence_input = left_panel.prominence_input
         self.distance_input = left_panel.distance_input
         self.height_input = left_panel.height_input
         self.width_input = left_panel.width_input
@@ -222,7 +221,7 @@ class MainWindow(QMainWindow):
         results_panel.regionChanged.connect(update_zoom)
         results_panel.sensitivityChanged.connect(update_sensitivity_value)
         left_panel.analysisRequested.connect(self._on_analysis_requested)
-        self.prominence_slider.valueChanged.connect(self.on_slider_value_changed)
+        # prominence_input signal is already connected in ControlPanel
         self.export_button.clicked.connect(self.export_results_to_xlsx)
         self.overlay_button.clicked.connect(self.add_overlay_spectrum)
         left_panel.batch_button.clicked.connect(
@@ -438,3 +437,74 @@ class MainWindow(QMainWindow):
         # Set initial sensitivity value
         if hasattr(self, 'sensitivity_info') and hasattr(results_panel, '_roi_shift_step'):
             self.sensitivity_info.setText(f"Nilai sensitivitas: {results_panel._roi_shift_step:.1f} nm")
+
+    def trigger_interactive_analysis(self):
+        idx = self.tabs.currentIndex()
+        if idx == getattr(self, "predict_tab_index", -1):
+            # Fast feedback while tuning controls: run preview preprocessing
+            if self.raw_asc_content:
+                self.previewRequested.emit(self.get_input_data())
+
+    def get_input_data(self) -> dict[str, Any]:
+        """Get input data from control panel"""
+        return self._left_panel_ref.get_parameters()
+
+    def _on_analysis_requested(self, data: dict[str, Any]):
+        """Handle analysis request from control panel"""
+        data["asc_content"] = self.raw_asc_content
+        self.analyzeRequested.emit(data)
+
+    def _on_preview_requested_with_zoom(self, data: dict[str, Any]):
+        """Handle preview with zoom data"""
+        pass
+
+    def _on_analyze_requested_with_zoom(self, data: dict[str, Any]):
+        """Handle analysis with zoom data"""
+        pass
+
+    def open_file_dialog(self):
+        """Placeholder for file dialog"""
+        pass
+
+    def export_results_to_xlsx(self):
+        """Placeholder for export"""
+        pass
+
+    def add_overlay_spectrum(self):
+        """Placeholder for overlay"""
+        pass
+
+    def open_batch_dialog(self, params):
+        """Placeholder for batch dialog"""
+        pass
+
+    def switch_selected_file(self):
+        """Placeholder for file switching"""
+        pass
+
+    def open_folder_dialog(self):
+        """Placeholder for folder dialog"""
+        pass
+
+    def custom_mouse_double_click(self, event):
+        """Placeholder for mouse double click"""
+        pass
+
+    def _setup_crosshair(self, plot_widget, which="main"):
+        """Placeholder for crosshair setup"""
+        pass
+
+    def show_error(self, error_message: str):
+        """Show error message"""
+        print(error_message)
+
+    def _on_full_finished_enable_export(self, results: dict[str, Any]):
+        """Handle full analysis results"""
+        self.last_results = results
+        has_table = bool(results.get("prediction_table") or results.get("validation_table"))
+        # export button is in results panel, not here
+
+    def _sync_state_from_results(self, results: dict[str, Any]):
+        """Sync state from results"""
+        self.last_results = results
+        # Additional sync logic if needed

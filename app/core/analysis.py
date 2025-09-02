@@ -2,15 +2,18 @@ from __future__ import annotations
 import numpy as np
 from scipy.signal import find_peaks, savgol_filter
 from typing import Any
+import gc  # For memory management
 
 from app.model import als_baseline_correction  # reuse existing implementation
 from app.model import load_assets as _load_assets
 
-# Load assets once for analysis
+# Load assets once for analysis - cached globally
 try:
     _MODEL, ELEMENT_MAP, TARGET_WAVELENGTHS = _load_assets()
+    print(f"Loaded model with {len(ELEMENT_MAP)} elements, {len(TARGET_WAVELENGTHS)} wavelength points")
 except (OSError, ValueError, RuntimeError, ImportError, FileNotFoundError):
     _MODEL, ELEMENT_MAP, TARGET_WAVELENGTHS = None, {}, np.array([], dtype=np.float32)
+    print("Warning: Model loading failed, using fallback mode")
 
 
 def run_preprocessing(input_data: dict[str, Any]) -> dict[str, Any]:
@@ -19,6 +22,8 @@ def run_preprocessing(input_data: dict[str, Any]) -> dict[str, Any]:
 
     Returns at least: { 'wavelengths', 'spectrum_data' } and also 'baseline' for overlay.
     """
+    global _MODEL
+    
     if not input_data.get("asc_content"):
         raise ValueError("ASC content kosong.")
 
@@ -50,18 +55,23 @@ def run_preprocessing(input_data: dict[str, Any]) -> dict[str, Any]:
     if shift_nm != 0.0:
         wavelengths = wavelengths + shift_nm
 
-    # Resample (optional)
+    # Resample (optional for preprocess mode, mandatory for predict/validate modes)
+    analysis_mode = (input_data.get("analysis_mode") or "preprocess").lower()
     use_raw = bool(input_data.get("use_raw_resolution", True))
-    if use_raw or TARGET_WAVELENGTHS.size == 0:
-        used_wavelengths = wavelengths
-        y = intensities.copy()
-    else:
-        # Resample to target grid. Avoid filling with hard zeros outside bounds,
-        # as that can flatten the signal when zooming/normalizing.
+    
+    # Force downsampling for prediction/validation modes to ensure model compatibility
+    if analysis_mode in ["predict", "validate"] or (not use_raw and TARGET_WAVELENGTHS.size > 0):
+        # Resample to target grid for ML model compatibility
         used_wavelengths = TARGET_WAVELENGTHS.astype(np.float64)
         left_fill = float(intensities[0]) if intensities.size else 0.0
         right_fill = float(intensities[-1]) if intensities.size else 0.0
         y = np.interp(used_wavelengths, wavelengths, intensities, left=left_fill, right=right_fill)
+        print(f"Spektrum di-downsampling dari {len(wavelengths)} ke {len(used_wavelengths)} titik untuk mode {analysis_mode}")
+    else:
+        # Use original resolution for preprocessing mode only
+        used_wavelengths = wavelengths
+        y = intensities.copy()
+        print(f"Menggunakan resolusi asli: {len(used_wavelengths)} titik untuk mode {analysis_mode}")
 
     # Baseline correction (optional)
     baseline = None
@@ -150,10 +160,32 @@ def run_peak_analysis(input_data: dict[str, Any], preprocessed_results: dict[str
     distance = int(input_data.get("distance") or 8)
     height = input_data.get("height")
     width = input_data.get("width")
-    threshold = float(input_data.get("threshold") or 0.6)
+    threshold = float(input_data.get("threshold") or 0.1)
     peak_indices, _ = find_peaks(
         spectrum_data, prominence=prominence, distance=distance, height=height, width=width
     )
+    
+    # Optimasi: batasi jumlah puncak untuk performa
+    max_peaks = 500  # Batasi maksimal 500 puncak
+    if len(peak_indices) > max_peaks:
+        # Ambil puncak tertinggi saja
+        peak_heights = spectrum_data[peak_indices]
+        top_indices = np.argsort(peak_heights)[-max_peaks:]
+        peak_indices = peak_indices[top_indices]
+        peak_indices = np.sort(peak_indices)  # Sort by wavelength
+        print(f"DEBUG Optimized: Limited to top {max_peaks} peaks from {len(peak_indices)} total")
+    
+    # Debug: print total peaks found
+    print(f"DEBUG Peak Detection: Found {len(peak_indices)} peaks across spectrum")
+    # Debug: print summary info (limited untuk performa)
+    if len(peak_indices) > 0:
+        print(f"DEBUG Peak wavelengths range: {used_wavelengths[peak_indices[0]]:.2f} - {used_wavelengths[peak_indices[-1]]:.2f} nm")
+        # Hanya print 5 puncak pertama dan terakhir untuk menghemat
+        print(f"DEBUG First 5 peaks: {[f'{used_wavelengths[i]:.2f}' for i in peak_indices[:5]]}")
+        if len(peak_indices) > 5:
+            print(f"DEBUG Last 5 peaks: {[f'{used_wavelengths[i]:.2f}' for i in peak_indices[-5:]]}")
+    print(f"DEBUG Parameters: prominence={prominence}, distance={distance}")
+    
     peak_wavelengths = used_wavelengths[peak_indices]
     peak_intensities = spectrum_data[peak_indices]
 
@@ -174,28 +206,161 @@ def run_peak_analysis(input_data: dict[str, Any], preprocessed_results: dict[str
             "radial_profile_error": None,
         }
 
-    # Map peaks to elements using nearest index on TARGET_WAVELENGTHS
+    # Run ML model prediction on the downsampled spectrum
     all_peaks_list = []
-    for i, wl in enumerate(peak_wavelengths):
-        intensity = float(peak_intensities[i])
-        if intensity < threshold:
-            continue
-        elements_here = []
-        if TARGET_WAVELENGTHS.size and ELEMENT_MAP:
+    mapped_count = 0
+    predictions = None
+    
+    # Early exit if no peaks to analyze
+    if len(peak_wavelengths) == 0:
+        print("DEBUG No peaks found for analysis")
+        return {
+            "analysis_mode": analysis_mode,
+            "spectrum_data": spectrum_data,
+            "wavelengths": used_wavelengths,
+            "peak_wavelengths": np.array([], dtype=np.float32),
+            "peak_intensities": np.array([], dtype=np.float32),
+            "annotations": [],
+            "prediction_table": [],
+            "validation_table": [],
+            "summary_metrics": {},
+            "baseline": baseline,
+            "radial_profile": None,
+            "radial_profile_error": None,
+        }
+    
+    if analysis_mode in ["predict", "validate"]:
+        # Lazy load model untuk menghemat memory
+        import torch
+        try:
+            global _MODEL
+            # Load model hanya saat diperlukan
+            if '_MODEL' not in globals() or _MODEL is None:
+                print("DEBUG Loading INFORMER model...")
+                from app.model import InformerModel, MODEL_CONFIG
+                
+                _MODEL = InformerModel(**MODEL_CONFIG)
+                state_dict = torch.load("assets/informer_multilabel_model.pth", map_location='cpu', weights_only=False)
+                _MODEL.load_state_dict(state_dict)
+                _MODEL.eval()
+                print("DEBUG Model loaded successfully")
+            
+            # Prepare input tensor: [batch_size, seq_length, input_dim]
+            input_tensor = torch.from_numpy(spectrum_data[np.newaxis, :, np.newaxis]).float()
+            
+            with torch.no_grad():
+                # Forward pass through INFORMER model (encoder only)
+                output_logits = _MODEL(input_tensor)  # Shape: [1, 4096, 18]
+                
+                # Apply sigmoid for multi-label classification
+                predictions = torch.sigmoid(output_logits).squeeze(0).cpu().numpy()  # Shape: [4096, 18]
+            
+            print(f"DEBUG Model Prediction: Generated predictions for {predictions.shape[0]} wavelength points, {predictions.shape[1]} elements")
+            
+            # Get element names from ELEMENT_MAP keys
+            element_names = list(ELEMENT_MAP.keys()) if ELEMENT_MAP else [f"Element_{i}" for i in range(18)]
+            
+            # Get prediction threshold from input (default 0.7 if not provided)
+            threshold_prob = float(input_data.get("prediction_threshold", 0.7))
+            
+            for i, wl in enumerate(peak_wavelengths):
+                intensity = float(peak_intensities[i])
+                if intensity < threshold:
+                    continue
+                    
+                elements_here = []
+                try:
+                    # Find nearest wavelength index in the downsampled spectrum
+                    nearest_idx = int(np.argmin(np.abs(used_wavelengths - wl)))
+                    
+                    # Get predictions at this wavelength point
+                    pred_at_peak = predictions[nearest_idx]  # Shape: [18]
+                    
+                    # Find elements above threshold
+                    detected_indices = np.where(pred_at_peak > threshold_prob)[0]
+                    
+                    for elem_idx in detected_indices:
+                        if elem_idx < len(element_names):
+                            element_name = element_names[elem_idx]
+                            # Skip background element
+                            if element_name.lower() == 'background':
+                                continue
+                            probability = pred_at_peak[elem_idx]
+                            elements_here.append(element_name)
+                            
+                            # Debug: log predictions for first few peaks
+                            if i < 10:
+                                print(f"DEBUG Peak {i} at {wl:.2f}nm: {element_name} ({probability:.3f})")
+                    
+                except (ValueError, TypeError, IndexError) as e:
+                    print(f"DEBUG Error mapping peak {i} at {wl:.2f}nm: {e}")
+                    continue
+                
+                if elements_here:
+                    all_peaks_list.append({
+                        "wavelength": float(wl), 
+                        "intensity": intensity, 
+                        "elements": elements_here
+                    })
+                    mapped_count += 1
+                    
+        except Exception as e:
+            print(f"DEBUG Model prediction failed: {e}")
+            # Fallback to ELEMENT_MAP if model fails
+            predictions = None
+    
+    # Fallback: Use ELEMENT_MAP for non-prediction modes or if model fails
+    if predictions is None and ELEMENT_MAP:
+        print("DEBUG Using ELEMENT_MAP fallback for element detection")
+        
+        # Calculate mapping from 4096 wavelengths to 18 element prediction points
+        num_predictions = 18  # ELEMENT_MAP has 18 prediction points
+        wavelength_range = TARGET_WAVELENGTHS[-1] - TARGET_WAVELENGTHS[0]  # 900 - 200 = 700nm
+        prediction_step = wavelength_range / (num_predictions - 1)  # Step size for predictions
+        
+        for i, wl in enumerate(peak_wavelengths):
+            intensity = float(peak_intensities[i])
+            if intensity < threshold:
+                continue
+            elements_here = []
             try:
-                nearest_idx = int(np.argmin(np.abs(TARGET_WAVELENGTHS - wl)))
-            except (ValueError, TypeError):
-                nearest_idx = None
-            if nearest_idx is not None:
+                # Find nearest wavelength index in TARGET_WAVELENGTHS
+                nearest_wl_idx = int(np.argmin(np.abs(TARGET_WAVELENGTHS - wl)))
+                target_wl = TARGET_WAVELENGTHS[nearest_wl_idx]
+                
+                # Map wavelength to prediction point index (0-17)
+                prediction_idx = int(round((target_wl - TARGET_WAVELENGTHS[0]) / prediction_step))
+                prediction_idx = max(0, min(17, prediction_idx))  # Clamp to valid range
+                
+                # Debug: log mapping details for first few peaks
+                if i < 10:
+                    print(f"DEBUG Fallback mapping peak {i}: {wl:.2f}nm -> wl_idx {nearest_wl_idx} -> pred_idx {prediction_idx} (target: {target_wl:.2f}nm)")
+                    
+                found_elements = []
                 for el, grid in ELEMENT_MAP.items():
                     try:
-                        weight = float(grid[nearest_idx])
+                        # Skip background element
+                        if el.lower() == 'background':
+                            continue
+                        weight = float(grid[prediction_idx])
+                        if weight > 0.5:
+                            elements_here.append(el)
+                            found_elements.append(f"{el}({weight})")
                     except (ValueError, TypeError, IndexError, KeyError):
                         weight = 0.0
-                    if weight > 0.5:
-                        elements_here.append(el)
-        if elements_here:
-            all_peaks_list.append({"wavelength": float(wl), "intensity": intensity, "elements": elements_here})
+                        
+                # Debug: log element mapping for first few peaks
+                if i < 10:
+                    print(f"DEBUG Fallback elements found at {wl:.2f}nm (pred_idx {prediction_idx}): {found_elements}")
+                    
+            except (ValueError, TypeError):
+                continue
+                
+            if elements_here:
+                all_peaks_list.append({"wavelength": float(wl), "intensity": intensity, "elements": elements_here})
+                mapped_count += 1
+    
+    print(f"DEBUG Element Mapping: {mapped_count} peaks mapped out of {len(peak_wavelengths)} total peaks")
 
     sorted_peaks = sorted(all_peaks_list, key=lambda p: p['intensity'], reverse=True)
 
@@ -263,9 +428,16 @@ def run_peak_analysis(input_data: dict[str, Any], preprocessed_results: dict[str
                 y_for_abel = y_for_abel[:-1]
             rp = abel.basex.basex_transform(y_for_abel, direction='inverse')
             radial_profile = rp.tolist() if hasattr(rp, 'tolist') else np.asarray(rp).tolist()
+            # Clean up temporary arrays
+            del y_for_abel, rp
         except (ImportError, ValueError, RuntimeError) as e:
             radial_profile_error = str(e)
             radial_profile = None
+
+    # Clean up large temporary arrays and force garbage collection for memory efficiency
+    if 'predictions' in locals():
+        del predictions
+    gc.collect()
 
     return {
         "analysis_mode": analysis_mode,
@@ -280,6 +452,9 @@ def run_peak_analysis(input_data: dict[str, Any], preprocessed_results: dict[str
         "baseline": baseline,
         "radial_profile": radial_profile,
         "radial_profile_error": radial_profile_error,
+        # Add downsampled data for zoom plot accuracy
+        "downsampled_wavelengths": used_wavelengths if analysis_mode in ["predict", "validate"] else None,
+        "downsampled_intensities": spectrum_data if analysis_mode in ["predict", "validate"] else None,
     }
 
 

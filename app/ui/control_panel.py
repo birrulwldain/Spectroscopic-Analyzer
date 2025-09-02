@@ -236,23 +236,22 @@ class ControlPanel(QWidget):
         peak_layout.setSpacing(10)
         peak_layout.setContentsMargins(10, 15, 10, 10)
         
-        # Prominence dengan slider dan label
+        # Prominence dengan input field
         prominence_group = QGroupBox("Prominence")
         prominence_group.setStyleSheet(groupbox_style)
         prominence_layout = QVBoxLayout(prominence_group)
         prominence_layout.setContentsMargins(10, 15, 10, 10)
         
-        self.prominence_slider = QSlider(Qt.Orientation.Horizontal)
-        self.prominence_slider.setMinimum(1)
-        self.prominence_slider.setMaximum(5000)
-        self.prominence_slider.setValue(100)
-        self.prominence_label = QLabel(f"{self.prominence_slider.value()/10000.0:.4f}")
-        self.prominence_label.setStyleSheet("QLabel { font-weight: bold; color: #0066cc; }")
+        # Tambahkan label untuk prominence
+        prominence_label = QLabel("Nilai minimum prominence untuk deteksi puncak:")
+        prominence_label.setStyleSheet("QLabel { color: #495057; font-size: 12px; margin-bottom: 5px; }")
+        prominence_layout.addWidget(prominence_label)
         
-        prom_row = QHBoxLayout()
-        prom_row.addWidget(self.prominence_slider)
-        prom_row.addWidget(self.prominence_label)
-        prominence_layout.addLayout(prom_row)
+        self.prominence_input = QLineEdit("0.01")
+        self.prominence_input.setStyleSheet("QLineEdit { padding: 3px; }")
+        self.prominence_input.setPlaceholderText("Contoh: 0.01")
+        
+        prominence_layout.addWidget(self.prominence_input)
         peak_layout.addWidget(prominence_group)
         
         # Parameter deteksi puncak lainnya
@@ -261,7 +260,7 @@ class ControlPanel(QWidget):
         params_form = QFormLayout(params_group)
         params_form.setContentsMargins(10, 15, 10, 10)
         
-        self.distance_input = QLineEdit("8")
+        self.distance_input = QLineEdit("3")
         self.height_input = QLineEdit()
         self.height_input.setPlaceholderText("Opsional, contoh: 0.1")
         self.width_input = QLineEdit()
@@ -289,9 +288,15 @@ class ControlPanel(QWidget):
         threshold_form = QFormLayout(threshold_group)
         threshold_form.setContentsMargins(10, 15, 10, 10)
         
-        self.threshold_input = QLineEdit("0.6")
-        self.threshold_input.setStyleSheet("QLineEdit { padding: 3px; font-weight: bold; }")
-        threshold_form.addRow("Prediction Threshold:", self.threshold_input)
+        self.threshold_input = QLineEdit("0.1")
+        self.threshold_input.setStyleSheet("QLineEdit { padding: 3px; }")
+        self.threshold_input.setPlaceholderText("Threshold intensitas minimum")
+        threshold_form.addRow("Intensity Threshold:", self.threshold_input)
+        
+        self.prediction_threshold_input = QLineEdit("0.7")
+        self.prediction_threshold_input.setStyleSheet("QLineEdit { padding: 3px; font-weight: bold; }")
+        self.prediction_threshold_input.setPlaceholderText("Threshold probabilitas sigmoid (0-1)")
+        threshold_form.addRow("Prediction Threshold:", self.prediction_threshold_input)
         
         model_layout.addWidget(threshold_group)
 
@@ -436,7 +441,7 @@ class ControlPanel(QWidget):
         layout.addLayout(right_column, 40)  # 40% width
 
         # Connect signals
-        self.prominence_slider.valueChanged.connect(self._on_prominence_changed)
+        self.prominence_input.textChanged.connect(self._on_prominence_changed)
         self.preview_button.clicked.connect(self._on_preview_clicked)
         self.predict_button.clicked.connect(self._on_predict_clicked)
         self.validate_button.clicked.connect(self._on_validate_clicked)
@@ -451,13 +456,17 @@ class ControlPanel(QWidget):
         return int(s) if s else None
 
     def get_parameters(self) -> dict[str, Any]:
-        prominence_val = float(self.prominence_slider.value()) / 10000.0
+        try:
+            prominence_val = float(self.prominence_input.text())
+        except ValueError:
+            prominence_val = 0.01  # default value
         return {
             "prominence": prominence_val,
             "distance": self._to_int(self.distance_input.text()),
             "height": self._to_float(self.height_input.text()),
             "width": self._to_float(self.width_input.text()),
             "threshold": self._to_float(self.threshold_input.text()),
+            "prediction_threshold": self._to_float(self.prediction_threshold_input.text()),
             "use_raw_resolution": self.raw_resolution_switch.isChecked(),
             "apply_baseline_correction": self.baseline_switch.isChecked(),
             "show_baseline_overlay": self.baseline_overlay_switch.isChecked(),
@@ -473,8 +482,9 @@ class ControlPanel(QWidget):
         }
 
     # ----------------- Signal emitters -----------------
-    def _on_prominence_changed(self, value: int):
-        self.prominence_label.setText(f"{float(value)/10000.0:.4f}")
+    def _on_prominence_changed(self, text: str):
+        # No need to update label since we removed it
+        pass
 
     def _on_preview_clicked(self):
         payload = self.get_parameters()
@@ -540,8 +550,7 @@ class ControlPanel(QWidget):
                 pass
         if "prominence" in p and isinstance(p["prominence"], (int, float)):
             try:
-                val = max(1, min(5000, int(float(p["prominence"]) * 10000)))
-                self.prominence_slider.setValue(val)
+                self.prominence_input.setText(str(float(p["prominence"])))
             except (TypeError, ValueError):
                 pass
 
@@ -554,6 +563,7 @@ class ControlPanel(QWidget):
         _set_line(self.height_input, "height")
         _set_line(self.width_input, "width")
         _set_line(self.threshold_input, "threshold")
+        _set_line(self.prediction_threshold_input, "prediction_threshold")
         _set_line(self.sg_window_input, "sg_window")
         _set_line(self.sg_poly_input, "sg_poly")
         _set_line(self.lam_input, "lam")

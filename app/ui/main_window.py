@@ -175,12 +175,12 @@ class MainWindow(QMainWindow):
         self.gt_input = left_panel.gt_input
         self.predict_tab_index = left_panel.predict_tab_index
         self.validate_tab_index = left_panel.validate_tab_index
-        self.prominence_slider = left_panel.prominence_slider
-        self.prominence_label = left_panel.prominence_label
+        self.prominence_input = left_panel.prominence_input
         self.distance_input = left_panel.distance_input
         self.height_input = left_panel.height_input
         self.width_input = left_panel.width_input
         self.threshold_input = left_panel.threshold_input
+        self.prediction_threshold_input = left_panel.prediction_threshold_input
         self.baseline_switch = left_panel.baseline_switch
         self.baseline_overlay_switch = left_panel.baseline_overlay_switch
         self.raw_resolution_switch = left_panel.raw_resolution_switch
@@ -220,7 +220,7 @@ class MainWindow(QMainWindow):
         results_panel.regionChanged.connect(update_zoom)
         results_panel.sensitivityChanged.connect(update_sensitivity_value)
         left_panel.analysisRequested.connect(self._on_analysis_requested)
-        self.prominence_slider.valueChanged.connect(self.on_slider_value_changed)
+        # prominence_input signal is handled in ControlPanel
         self.export_button.clicked.connect(self.export_results_to_xlsx)
         self.overlay_button.clicked.connect(self.add_overlay_spectrum)
         left_panel.batch_button.clicked.connect(
@@ -372,6 +372,80 @@ class MainWindow(QMainWindow):
         open_folder_btn.clicked.connect(self.open_folder_dialog)
         buttons_layout.addWidget(open_folder_btn)
         
+        # Tambahkan tombol ekspor publikasi
+        try:
+            import matplotlib.pyplot as plt
+            MATPLOTLIB_AVAILABLE = True
+            print("DEBUG: Matplotlib tersedia, membuat tombol ekspor publikasi")
+        except ImportError:
+            MATPLOTLIB_AVAILABLE = False
+            print("DEBUG: Matplotlib tidak tersedia")
+            
+        if MATPLOTLIB_AVAILABLE:
+            export_pub_btn = QPushButton("📊 Export Publication Plot")
+            export_pub_btn.setMinimumHeight(35)
+            export_pub_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+            export_pub_btn.setStyleSheet("""
+                QPushButton {
+                    background-color: #e74c3c;
+                    color: white;
+                    border-radius: 4px;
+                    padding: 8px;
+                    font-weight: bold;
+                    font-size: 11px;
+                    border: 2px solid #c0392b;
+                }
+                QPushButton:hover {
+                    background-color: #c0392b;
+                    border: 2px solid #a93226;
+                }
+                QPushButton:pressed {
+                    background-color: #a93226;
+                }
+                QPushButton:disabled {
+                    background-color: #95a5a6;
+                    color: #7f8c8d;
+                    border: 2px solid #7f8c8d;
+                }
+            """)
+            export_pub_btn.setToolTip("Export current zoom region as publication-ready plot\n(PNG, PDF, SVG, EPS formats)")
+            export_pub_btn.clicked.connect(self._export_publication_plot)
+            buttons_layout.addWidget(export_pub_btn)
+            self.export_pub_button = export_pub_btn
+            
+            # Add ASC data export button
+            export_asc_btn = QPushButton("📄 Export ASC Data")
+            export_asc_btn.setMinimumHeight(35)
+            export_asc_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+            export_asc_btn.setStyleSheet("""
+                QPushButton {
+                    background-color: #2E8B57;
+                    color: white;
+                    border: none;
+                    border-radius: 8px;
+                    font-weight: bold;
+                    font-size: 12px;
+                    padding: 8px;
+                }
+                QPushButton:hover {
+                    background-color: #3CB371;
+                    transform: translateY(-1px);
+                }
+                QPushButton:pressed {
+                    background-color: #228B22;
+                    transform: translateY(0px);
+                }
+                QPushButton:disabled {
+                    background-color: #CCCCCC;
+                    color: #666666;
+                }
+            """)
+            export_asc_btn.setToolTip("Export current spectrum data as ASC file\n(Wavelength and Intensity data in tab-separated format)")
+            export_asc_btn.clicked.connect(self._export_asc_data)
+            buttons_layout.addWidget(export_asc_btn)
+            self.export_asc_button = export_asc_btn
+            print("DEBUG: Tombol ekspor publikasi ditambahkan ke file list area")
+
         file_list_layout.addLayout(buttons_layout)
         
         # Tambahkan stretching di bagian bawah file list layout
@@ -425,6 +499,9 @@ class MainWindow(QMainWindow):
         vb = self.plot_widget.getViewBox()
         if vb is not None:
             vb.mouseDoubleClickEvent = self.custom_mouse_double_click
+            
+        # Initialize ASC export button state
+        self._update_asc_export_button()
 
     def open_batch_dialog(self, params_template: dict[str, Any]):
         dlg = BatchDialog(self, params_template)
@@ -542,6 +619,68 @@ class MainWindow(QMainWindow):
                 font = item.font()
                 font.setBold(True)
                 item.setFont(font)
+
+    def _export_publication_plot(self):
+        """Export current zoom region as publication-ready plot"""
+        try:
+            # Check if results panel has export method
+            if hasattr(self.results_panel, 'export_publication_plot'):
+                self.results_panel.export_publication_plot()
+            else:
+                QMessageBox.warning(self, "Export Error", 
+                                  "Export functionality not available in results panel")
+        except Exception as e:
+            QMessageBox.critical(self, "Export Error", 
+                               f"Failed to export plot: {str(e)}")
+
+    def _export_asc_data(self):
+        """Export current spectrum data as ASC file"""
+        if self.current_wavelengths is None or self.current_intensities is None:
+            QMessageBox.warning(self, "Export Error", 
+                              "No spectrum data available for export")
+            return
+            
+        if not self.current_file_name:
+            QMessageBox.warning(self, "Export Error", 
+                              "No file selected for export")
+            return
+            
+        # Get filename for export
+        base_name = os.path.splitext(self.current_file_name)[0]
+        default_filename = f"{base_name}_exported.asc"
+        
+        filename, _ = QFileDialog.getSaveFileName(
+            self,
+            "Export Spectrum Data as ASC",
+            default_filename,
+            "ASC files (*.asc);;Text files (*.txt);;All files (*.*)"
+        )
+        
+        if not filename:
+            return
+            
+        try:
+            # Write ASC format: tab-separated wavelength and intensity
+            with open(filename, 'w', encoding='utf-8') as f:
+                f.write("# Wavelength (nm)\tIntensity\n")
+                for wl, intensity in zip(self.current_wavelengths, self.current_intensities):
+                    f.write(f"{wl:.5f}\t{intensity:.1f}\n")
+            
+            self.status_label.setText(f"ASC data exported to: {filename}")
+            QMessageBox.information(self, "Export Successful", 
+                                  f"Spectrum data exported successfully to:\n{filename}")
+                                  
+        except Exception as e:
+            self.status_label.setText(f"Failed to export ASC data: {str(e)}")
+            QMessageBox.critical(self, "Export Error", 
+                               f"Failed to export ASC data:\n{str(e)}")
+
+    def _update_asc_export_button(self):
+        """Enable/disable ASC export button based on data availability"""
+        if hasattr(self, 'export_asc_button'):
+            has_data = (self.current_wavelengths is not None and 
+                       self.current_intensities is not None)
+            self.export_asc_button.setEnabled(has_data)
 
     def open_file_dialog(self):
         # Dialog untuk memilih banyak file sekaligus
@@ -780,6 +919,9 @@ class MainWindow(QMainWindow):
         self.current_peaks_wl = None
         self.current_peaks_int = None
         
+        # Update ASC export button state
+        self._update_asc_export_button()
+        
         # Trigger a quick preview so ResultsPanel draws the loaded signal
         self.previewRequested.emit(self.get_input_data())
     
@@ -828,6 +970,9 @@ class MainWindow(QMainWindow):
         self.current_peaks_wl = None
         self.current_peaks_int = None
         
+        # Update ASC export button state
+        self._update_asc_export_button()
+        
         # Trigger a quick preview so ResultsPanel draws the loaded signal
         self.previewRequested.emit(self.get_input_data())
         
@@ -845,7 +990,10 @@ class MainWindow(QMainWindow):
         def to_int(s: str | None):
             return int(s) if s else None
 
-        prominence_val = float(self.prominence_slider.value()) / 10000.0
+        try:
+            prominence_val = float(self.prominence_input.text())
+        except ValueError:
+            prominence_val = 0.01  # default value
         return {
             "asc_content": self.raw_asc_content,
             "prominence": prominence_val,
@@ -879,12 +1027,14 @@ class MainWindow(QMainWindow):
             return
         # Quick preview: only preprocessing results
         data = self.get_input_data()
+        data["analysis_mode"] = "preprocess"
         self.previewRequested.emit(data)
 
     def start_validation(self):
         if not self.raw_asc_content:
             return
         input_data = self.get_input_data()
+        input_data["analysis_mode"] = "validate"
         input_data["ground_truth_elements"] = [
             el.strip() for el in self.gt_input.text().split(",") if el.strip()
         ]
@@ -1005,12 +1155,7 @@ class MainWindow(QMainWindow):
         self.reset_main_view()
         event.accept()
 
-    def on_slider_value_changed(self, value: int):
-        pval = float(value) / 10000.0
-        self.prominence_label.setText(f"{pval:.4f}")
-        if self.debounce_timer.isActive():
-            self.debounce_timer.stop()
-        self.debounce_timer.start()
+    # Removed on_slider_value_changed since we now use input field
 
     def trigger_interactive_analysis(self):
         idx = self.tabs.currentIndex()

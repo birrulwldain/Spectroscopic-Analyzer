@@ -164,11 +164,18 @@ class Handler:
             # 3. Deteksi Puncak
             peak_indices, _ = find_peaks(spectrum_data, height=0.03, distance=8)
             
-            # 4. Lakukan Prediksi
-            input_tensor = torch.from_numpy(spectrum_data[np.newaxis, :, np.newaxis])
+            # 4. Lakukan Prediksi dengan Model INFORMER
+            # Input tensor: [batch_size, seq_length, input_dim] = [1, 4096, 1]
+            input_tensor = torch.from_numpy(spectrum_data[np.newaxis, :, np.newaxis]).float()
+            
             with torch.no_grad():
-                output_logits = model(input_tensor)
-                full_probabilities = torch.sigmoid(output_logits).squeeze(0).cpu().numpy()
+                # Forward pass melalui encoder INFORMER
+                output_logits = model(input_tensor)  # Output: [1, 4096, 18]
+                
+                # Aplikasikan sigmoid untuk klasifikasi multi-label
+                full_probabilities = torch.sigmoid(output_logits).squeeze(0).cpu().numpy()  # [4096, 18]
+            
+            # Threshold untuk deteksi elemen (probabilitas > 0.7)
             full_predictions = (full_probabilities > 0.7).astype(int)
 
             # 5. Format Anotasi untuk dikirim ke Plotly di frontend

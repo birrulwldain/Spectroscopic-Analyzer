@@ -306,7 +306,7 @@ class ControlPanel(QWidget):
         threshold_form = QFormLayout(threshold_group)
         threshold_form.setContentsMargins(10, 15, 10, 10)
         
-        self.threshold_input = QLineEdit("0.6")
+        self.threshold_input = QLineEdit("0.1")
         self.threshold_input.setStyleSheet("QLineEdit { padding: 3px; font-weight: bold; }")
         threshold_form.addRow("Prediction Threshold:", self.threshold_input)
         
