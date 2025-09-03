@@ -24,14 +24,9 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up Node (for bump-cli install)
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-
-      - name: Install bump-cli
+      - name: Pull Bump CLI Docker image
         run: |
-          npm install -g @bump-sh/cli
+          docker pull ghcr.io/bump-sh/cli:latest
 
       - name: Publish OpenAPI to Bump.sh
         run: |
@@ -41,11 +36,16 @@ jobs:
           fi
           DOC_SLUG="${{ github.event.inputs.doc_slug || 'panglateh-spectroscopic-analyzer' }}"
           HUB_SLUG="${{ github.event.inputs.hub_slug }}"
+          BASE_ARGS=(deploy docs/openapi.yaml --token "${{ secrets.BUMP_TOKEN }}" --doc "$DOC_SLUG" --public)
           if [ -n "$HUB_SLUG" ]; then
-            bump deploy docs/openapi.yaml --token "${{ secrets.BUMP_TOKEN }}" --hub "$HUB_SLUG" --doc "$DOC_SLUG" --public
-          else
-            bump deploy docs/openapi.yaml --token "${{ secrets.BUMP_TOKEN }}" --doc "$DOC_SLUG" --public
+            BASE_ARGS+=(--hub "$HUB_SLUG")
           fi
+          docker run --rm \
+            -e BUMP_TOKEN="${{ secrets.BUMP_TOKEN }}" \
+            -v "${GITHUB_WORKSPACE}:/work" \
+            -w /work \
+            ghcr.io/bump-sh/cli:latest \
+            "${BASE_ARGS[@]}"
 
       - name: Output docs URL
         if: always()
