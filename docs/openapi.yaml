@@ -1,0 +1,112 @@
+openapi: 3.0.3
+# bump: trigger publish at 2025-09-03
+info:
+  title: Spectroscopic Analyzer API
+  description: |
+    Public placeholder API specification to publish documentation on Bump.sh.
+    This desktop app doesn't expose an HTTP API, but this spec lets you set up
+    a documentation space. Replace endpoints later if/when you publish a real API.
+  version: 0.1.0
+  contact:
+    name: panglateh
+    url: https://bump.sh/panglateh/dashboard
+
+servers:
+  - url: https://api.example.com
+    description: Placeholder server
+
+tags:
+  - name: spectra
+    description: Operations related to spectra processing
+  - name: prediction
+    description: Operations related to element prediction
+
+paths:
+  /spectra:
+    post:
+      tags: [spectra]
+      summary: Upload spectrum data
+      description: |
+        Accept a spectrum (wavelength,intensity pairs) and returns a normalized/processed spectrum id.
+        Replace with your real API if applicable.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                wavelengths:
+                  type: array
+                  items: { type: number, format: float }
+                intensities:
+                  type: array
+                  items: { type: number, format: float }
+              required: [wavelengths, intensities]
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                    example: spc_12345
+        '400':
+          description: Bad Request
+
+  /predictions:
+    post:
+      tags: [prediction]
+      summary: Predict elements from a spectrum
+      description: |
+        Submit a spectrum id and receive element predictions with sigmoid scores.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                spectrum_id:
+                  type: string
+                  example: spc_12345
+                threshold:
+                  type: number
+                  format: float
+                  description: Minimum sigmoid probability to include a label
+                  default: 0.5
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  elements:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        label:
+                          type: string
+                          example: Fe
+                        score:
+                          type: number
+                          format: float
+                          example: 0.91
+        '404':
+          description: Spectrum not found
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+security:
+  - bearerAuth: []

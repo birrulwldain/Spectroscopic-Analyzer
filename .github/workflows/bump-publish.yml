@@ -1,0 +1,56 @@
+name: Publish API docs to Bump.sh
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'docs/openapi.yaml'
+      - '.github/workflows/bump-publish.yml'
+  workflow_dispatch:
+    inputs:
+      doc_slug:
+        description: Bump.sh documentation slug (e.g., spectroscopic-analyzer)
+        required: false
+        default: spectroscopic-analyzer
+      hub_slug:
+        description: Optional Hub slug (leave empty to publish a single doc)
+        required: false
+        default: ''
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node (for bump-cli install)
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install bump-cli
+        run: |
+          npm install -g @bump.sh/cli
+
+      - name: Publish OpenAPI to Bump.sh
+        env:
+          BUMP_TOKEN: ${{ secrets.BUMP_TOKEN }}
+        run: |
+          if [ -z "$BUMP_TOKEN" ]; then
+            echo "BUMP_TOKEN secret is missing" >&2
+            exit 1
+          fi
+          DOC_SLUG="${{ github.event.inputs.doc_slug || 'spectroscopic-analyzer' }}"
+          HUB_SLUG="${{ github.event.inputs.hub_slug }}"
+          if [ -n "$HUB_SLUG" ]; then
+            bump deploy docs/openapi.yaml --token "$BUMP_TOKEN" --hub "$HUB_SLUG" --doc "$DOC_SLUG" --public
+          else
+            bump deploy docs/openapi.yaml --token "$BUMP_TOKEN" --doc "$DOC_SLUG" --public
+          fi
+
+      - name: Output docs URL
+        if: always()
+        run: |
+          DOC_SLUG="${{ github.event.inputs.doc_slug || 'spectroscopic-analyzer' }}"
+          echo "Published to: https://bump.sh/docs/$DOC_SLUG"

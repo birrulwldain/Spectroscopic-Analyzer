@@ -1,4 +1,50 @@
 # Spectroscopic-Analyzer
+## Bump.sh Documentation Setup (End-to-End)
+
+This project includes a minimal OpenAPI spec and a CI workflow to publish documentation to Bump.sh.
+
+### What you need to provide
+
+- Bump.sh account and access to org/workspace (e.g., `panglateh`).
+- A Bump API token (generate at bump.sh → Account → Personal access tokens).
+- A documentation slug, e.g., `spectroscopic-analyzer`.
+
+### Files added
+
+- `docs/openapi.yaml`: Minimal OpenAPI 3.0 spec (placeholder endpoints). Replace with your real API later.
+- `.github/workflows/bump-publish.yml`: GitHub Actions workflow to publish docs on pushes to `main`.
+
+### Set up GitHub secret
+
+Add the secret in your repository settings:
+
+- Name: `BUMP_TOKEN`
+- Value: your Bump.sh API token
+
+### How publishing works
+
+- On every push to `main` that touches `docs/openapi.yaml`, the workflow deploys to Bump.sh.
+- You can also run it manually from the Actions tab (workflow_dispatch) and override:
+  - `doc_slug` (default `spectroscopic-analyzer`)
+  - `hub_slug` if you use a Hub
+
+### Local validation (optional)
+
+If you want to test locally using the CLI:
+
+```bash
+npm i -g @bump.sh/cli
+export BUMP_TOKEN=your_token_here
+bump deploy docs/openapi.yaml --doc spectroscopic-analyzer --public
+```
+
+### Customize
+
+- Replace placeholder server URL, paths, and schemas in `docs/openapi.yaml`.
+- If you want private docs, remove `--public` in the workflow and configure visibility in Bump.
+- If you use Hubs, set `hub_slug` in the manual run or hardcode `--hub your-hub`.
+
+# Spectroscopic-Analyzer
 
 Dokumentasi ringkas untuk memahami struktur proyek, komponen utama, dan cara menjalankan aplikasi.
 
