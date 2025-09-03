@@ -31,7 +31,7 @@ jobs:
 
       - name: Install bump-cli
         run: |
-          npm install -g @bump.sh/cli
+          npm install -g @bump-sh/cli
 
       - name: Publish OpenAPI to Bump.sh
         run: |
