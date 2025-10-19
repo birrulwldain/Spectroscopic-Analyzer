@@ -2,6 +2,7 @@ from PySide6 import QtWidgets, QtCore
 import pyqtgraph as pg
 import numpy as np
 from scipy import signal
+import matplotlib.pyplot as plt
 
 class MainWindow(QtWidgets.QMainWindow):
     def __init__(self):
@@ -40,9 +41,19 @@ class MainWindow(QtWidgets.QMainWindow):
         right_top_layout = QtWidgets.QVBoxLayout(right_top_panel)
         right_top_layout.setContentsMargins(0, 0, 0, 0)
 
+        # Header dengan tombol ekspor
+        right_top_header_layout = QtWidgets.QHBoxLayout()
+
         right_top_label = QtWidgets.QLabel("🔍 Preview: Element Labels (Selected Region)")
         right_top_label.setStyleSheet("font-weight: bold; padding: 5px; background-color: #50c878; color: white;")
-        right_top_layout.addWidget(right_top_label)
+        right_top_header_layout.addWidget(right_top_label, 1)
+
+        btn_export_plot = QtWidgets.QPushButton("📊 Export Scientific Plot")
+        btn_export_plot.setStyleSheet("font-weight: bold; padding: 3px 8px; background-color: #FFD700; color: black;")
+        btn_export_plot.setToolTip("Export the current plot as a publication-ready scientific figure")
+        right_top_header_layout.addWidget(btn_export_plot)
+
+        right_top_layout.addLayout(right_top_header_layout)
 
         self.detail_plot_widget = pg.PlotWidget()
         self.detail_plot_widget.setLabel('left', 'Intensity', **{'font-size': '11pt'})
@@ -150,6 +161,13 @@ class MainWindow(QtWidgets.QMainWindow):
         min_distance_input = QtWidgets.QLineEdit("5")
         min_distance_input.setPlaceholderText("Minimum distance between peaks")
 
+        self.threshold_input = threshold_input
+        self.min_height_input = min_height_input
+        self.min_width_input = min_width_input
+        self.max_peaks_input = max_peaks_input
+        self.prominence_input = prominence_input
+        self.min_distance_input = min_distance_input
+
         prediction_layout.addWidget(threshold_label)
         prediction_layout.addWidget(threshold_input)
         prediction_layout.addWidget(min_height_label)
@@ -164,25 +182,33 @@ class MainWindow(QtWidgets.QMainWindow):
         prediction_layout.addWidget(min_distance_input)
         param_container_layout.addWidget(prediction_group)
 
-        # Measurement group
-        measurement_group = QtWidgets.QGroupBox("📈 Measurement")
-        measurement_group.setStyleSheet("QGroupBox { font-weight: bold; }")
-        measurement_layout = QtWidgets.QVBoxLayout(measurement_group)
-        btn_start = QtWidgets.QPushButton("▶️ Start")
-        btn_stop = QtWidgets.QPushButton("⏹️ Stop")
-        btn_start.setMinimumHeight(35)
-        btn_stop.setMinimumHeight(35)
-        measurement_layout.addWidget(btn_start)
-        measurement_layout.addWidget(btn_stop)
-        param_container_layout.addWidget(measurement_group)
+        # Wavelength Range group
+        wavelength_group = QtWidgets.QGroupBox("🌊 Wavelength Range")
+        wavelength_group.setStyleSheet("QGroupBox { font-weight: bold; }")
+        wavelength_layout = QtWidgets.QVBoxLayout(wavelength_group)
 
-        # Results display
-        results_group = QtWidgets.QGroupBox("📊 Analysis Results")
+        min_wavelength_label = QtWidgets.QLabel("Min Wavelength (nm):")
+        min_wavelength_input = QtWidgets.QLineEdit("200")
+        min_wavelength_input.setPlaceholderText("Minimum wavelength")
+
+        max_wavelength_label = QtWidgets.QLabel("Max Wavelength (nm):")
+        max_wavelength_input = QtWidgets.QLineEdit("800")
+        max_wavelength_input.setPlaceholderText("Maximum wavelength")
+
+        self.min_wavelength_input = min_wavelength_input
+        self.max_wavelength_input = max_wavelength_input
+
+        wavelength_layout.addWidget(min_wavelength_label)
+        wavelength_layout.addWidget(min_wavelength_input)
+        wavelength_layout.addWidget(max_wavelength_label)
+        wavelength_layout.addWidget(max_wavelength_input)
+        param_container_layout.addWidget(wavelength_group)
+
+        # Results group
+        results_group = QtWidgets.QGroupBox("Results")
         results_group.setStyleSheet("QGroupBox { font-weight: bold; }")
         results_layout = QtWidgets.QVBoxLayout(results_group)
-        self.results_label = QtWidgets.QLabel("No results yet.")
-        self.results_label.setWordWrap(True)
-        self.results_label.setStyleSheet("padding: 10px; background-color: #f9f9f9; border: 1px solid #ddd;")
+        self.results_label = QtWidgets.QLabel("Results will appear here after prediction.")
         results_layout.addWidget(self.results_label)
         param_container_layout.addWidget(results_group)
 
@@ -243,6 +269,7 @@ class MainWindow(QtWidgets.QMainWindow):
         btn_load_folder.clicked.connect(self.load_folder)
         btn_preprocess.clicked.connect(self.preprocess_current_file)
         btn_predict.clicked.connect(self.predict_current_file)
+        btn_export_plot.clicked.connect(self.export_publication_plot)
         self.data_table.cellClicked.connect(self.on_file_selected)
 
         # Menu bar
@@ -263,8 +290,8 @@ class MainWindow(QtWidgets.QMainWindow):
         tool_bar.addAction("Save")
         tool_bar.addAction("Start")
         tool_bar.addAction("Stop")
-        tool_bar.addSeparator()
-        tool_bar.addAction("Zoom")
+        self.min_wavelength_input.editingFinished.connect(self.update_region_from_inputs)
+        self.max_wavelength_input.editingFinished.connect(self.update_region_from_inputs)
         tool_bar.addAction("Pan")
         tool_bar.addAction("Reset")
         tool_bar.addSeparator()
@@ -311,9 +338,6 @@ class MainWindow(QtWidgets.QMainWindow):
                 return False
             model, element_map, target_wavelengths = assets
             # Basic validations
-            if model is None:
-                self.log_text.append("Model asset is None")
-                return False
             if not hasattr(model, '__call__'):
                 self.log_text.append(f"Loaded model object is not callable: {type(model)}")
                 return False
@@ -565,7 +589,16 @@ class MainWindow(QtWidgets.QMainWindow):
                 # Default region: tengah spektrum ±100nm
                 wl_min, wl_max = wavelengths[0], wavelengths[-1]
                 wl_center = (wl_min + wl_max) / 2
-                initial_region = (wl_center - 50, wl_center + 50)
+                # Try to use input values for initial region
+                try:
+                    input_min = float(self.min_wavelength_input.text())
+                    input_max = float(self.max_wavelength_input.text())
+                    if input_min < input_max and wl_min <= input_min <= wl_max and wl_min <= input_max <= wl_max:
+                        initial_region = (input_min, input_max)
+                    else:
+                        initial_region = (wl_center - 50, wl_center + 50)
+                except ValueError:
+                    initial_region = (wl_center - 50, wl_center + 50)
 
                 self.region_selector = pg.LinearRegionItem(
                     values=initial_region,
@@ -602,8 +635,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
         except Exception as e:
             self.log_text.append(f"Error plotting spectrum: {e}")
-            import traceback
-            self.log_text.append(f"Traceback:\n{traceback.format_exc()}")
+            self.log_text.append(traceback.format_exc())
 
     def update_detail_plot(self):
         """Update plot detail berdasarkan region yang dipilih di plot utama"""
@@ -711,5 +743,132 @@ class MainWindow(QtWidgets.QMainWindow):
 
         except Exception as e:
             self.log_text.append(f"Error updating detail plot: {e}")
+            import traceback
+            self.log_text.append(f"Traceback:\n{traceback.format_exc()}")
+
+    def update_region_from_inputs(self):
+        """Update the region selector based on min and max wavelength inputs"""
+        try:
+            min_wl = float(self.min_wavelength_input.text())
+            max_wl = float(self.max_wavelength_input.text())
+            if hasattr(self, 'region_selector'):
+                self.region_selector.setRegion((min_wl, max_wl))
+        except ValueError:
+            pass  # Ignore invalid input
+
+    def export_publication_plot(self):
+        """Export the current detail plot (preview) with element labels as a publication-ready scientific figure"""
+        try:
+            # Check if we have spectrum data and region selector
+            if not hasattr(self, 'wavelengths') or not hasattr(self, 'spectrum') or not hasattr(self, 'region_selector'):
+                self.log_text.append("No spectrum data or region selector available for export. Please load, process a file, and select a region first.")
+                return
+
+            # Get current region
+            region_range = self.region_selector.getRegion()
+            wl_start, wl_end = region_range
+
+            # Find indices in range
+            mask = (self.wavelengths >= wl_start) & (self.wavelengths <= wl_end)
+            indices = np.where(mask)[0]
+
+            if len(indices) == 0:
+                self.log_text.append("No data in selected region for export.")
+                return
+
+            # Extract data for region
+            wl_region = self.wavelengths[indices]
+            spectrum_region = self.spectrum[indices]
+            spatial_pred_region = self.spatial_pred[indices, :]
+
+            # Create matplotlib figure with publication style
+            plt.style.use('seaborn-v0_8-paper')  # Use a clean style
+            fig, ax = plt.subplots(figsize=(12, 8), dpi=300)
+
+            # Plot the spectrum region
+            ax.plot(wl_region, spectrum_region, color='black', linewidth=1.0)
+
+            # Get detection threshold
+            try:
+                detection_threshold = float(self.threshold_input.text())
+            except ValueError:
+                detection_threshold = 0.4
+
+            # Add detected elements annotations
+            colors = [
+                (255, 0, 0), (255, 102, 0), (255, 170, 0), (255, 215, 0), (0, 255, 0),
+                (0, 255, 255), (0, 136, 255), (0, 0, 255), (136, 0, 255), (255, 0, 255)
+            ]
+
+            element_annotations = []
+            for idx in range(len(wl_region)):
+                wl = wl_region[idx]
+                intensity = spectrum_region[idx]
+                labels_at_wl = []
+                for elem, global_prob in self.detected_elements[:10]:  # Limit to 10 elements
+                    elem_idx = self.element_names.index(elem)
+                    prob = spatial_pred_region[idx, elem_idx]
+                    if prob > detection_threshold:
+                        labels_at_wl.append((elem, prob, colors[self.element_names.index(elem) % len(colors)]))
+
+                if labels_at_wl:
+                    # Use primary color for scatter
+                    primary_color = labels_at_wl[0][2]
+                    ax.scatter(wl, intensity, color=np.array(primary_color)/255, s=60, zorder=5, edgecolors='black', linewidth=0.5)
+
+                    # Create annotation text
+                    label_parts = [f"{elem}:{prob:.1%}" for elem, prob, _ in labels_at_wl]
+                    text_label = "\n".join(label_parts) + f"\n{wl:.1f}nm"
+
+                    # Position annotation above the point
+                    ax.annotate(text_label,
+                              xy=(wl, intensity),
+                              xytext=(5, 20),
+                              textcoords='offset points',
+                              bbox=dict(boxstyle='round,pad=0.3', facecolor='white', alpha=0.9, edgecolor='gray'),
+                              fontsize=9, ha='left', va='bottom',
+                              arrowprops=dict(arrowstyle='->', color='gray', alpha=0.7))
+
+            # Customize plot for publication
+            ax.set_xlabel('Wavelength (nm)', fontsize=14, fontweight='bold')
+            ax.set_ylabel('Normalized Intensity', fontsize=14, fontweight='bold')
+            ax.set_title(f'Spectroscopic Analysis - Detail View ({wl_start:.1f} - {wl_end:.1f} nm)',
+                        fontsize=16, fontweight='bold', pad=20)
+            ax.grid(True, alpha=0.3)
+            ax.tick_params(axis='both', which='major', labelsize=12)
+            ax.set_xlim(wl_start, wl_end)
+
+            # Add file info
+            if self.current_file:
+                ax.text(0.02, 0.98, f'File: {self.current_file}\nRegion: {wl_start:.1f} - {wl_end:.1f} nm',
+                       transform=ax.transAxes, fontsize=10, verticalalignment='top',
+                       bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.7))
+
+            plt.tight_layout()
+
+            # Save dialog
+            file_path, _ = QtWidgets.QFileDialog.getSaveFileName(self, "Save Publication Plot", "", "PNG Files (*.png);;PDF Files (*.pdf);;SVG Files (*.svg)")
+            if file_path:
+                import os
+                if os.path.isdir(file_path):
+                    self.log_text.append("Selected path is a directory. Please select a valid file name.")
+                    plt.close(fig)
+                    return
+                # Determine format from extension
+                if file_path.lower().endswith('.pdf'):
+                    plt.savefig(file_path, format='pdf', bbox_inches='tight', dpi=300)
+                elif file_path.lower().endswith('.svg'):
+                    plt.savefig(file_path, format='svg', bbox_inches='tight')
+                else:
+                    plt.savefig(file_path, format='png', bbox_inches='tight', dpi=300)
+
+                self.log_text.append(f"✓ Publication plot exported to: {file_path}")
+            else:
+                self.log_text.append("Export cancelled.")
+
+            plt.close(fig)  # Close the figure to free memory
+
+        except Exception as e:
+            self.log_text.append(f"Error exporting publication plot: {e}")
             import traceback
             self.log_text.append(f"Traceback:\n{traceback.format_exc()}")
