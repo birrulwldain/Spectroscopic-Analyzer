@@ -673,6 +673,21 @@ class MainWindow(QtWidgets.QMainWindow):
             spectrum_region = self.spectrum[indices]
             spatial_pred_region = self.spatial_pred[indices, :]
 
+            # Detect peaks in the spectrum region
+            peaks, properties = signal.find_peaks(
+                spectrum_region,
+                height=min_height,
+                width=min_width,
+                prominence=prominence,
+                distance=min_distance
+            )
+
+            # Limit to max_peaks if specified
+            if len(peaks) > max_peaks:
+                # Sort by prominence and take top max_peaks
+                sorted_peaks = sorted(zip(peaks, properties['prominences']), key=lambda x: x[1], reverse=True)[:max_peaks]
+                peaks = [p[0] for p in sorted_peaks]
+
             # Clear detail plot
             self.detail_plot_widget.clear()
 
@@ -683,57 +698,57 @@ class MainWindow(QtWidgets.QMainWindow):
                 name='Spectrum'
             )
 
-            # Untuk setiap wavelength di region, cek elemen yang terdeteksi
+            # Label peaks with detected elements
             all_labels = []
-            for idx in range(len(wl_region)):
-                wl = wl_region[idx]
-                intensity = spectrum_region[idx]
-                labels_at_wl = []
-                for elem, global_prob in self.detected_elements[:10]:  # Batasi 10 elemen
+            for peak_idx in peaks:
+                wl = wl_region[peak_idx]
+                intensity = spectrum_region[peak_idx]
+
+                # Find the element with highest probability around this peak (within ±5 points)
+                best_elem = None
+                best_prob = 0
+                best_color = None
+                start_idx = max(0, peak_idx - 5)
+                end_idx = min(len(spatial_pred_region), peak_idx + 6)
+                for elem, global_prob in self.detected_elements[:10]:
                     elem_idx = self.element_names.index(elem)
-                    prob = spatial_pred_region[idx, elem_idx]
-                    if prob > detection_threshold:
-                        labels_at_wl.append((elem, prob, self.colors[self.element_names.index(elem) % len(self.colors)]))
+                    prob_region = spatial_pred_region[start_idx:end_idx, elem_idx]
+                    max_prob = np.max(prob_region)
+                    if max_prob > best_prob and max_prob > detection_threshold:
+                        best_prob = max_prob
+                        best_elem = elem
+                        best_color = self.colors[elem_idx % len(self.colors)]
 
-                if labels_at_wl:
-                    # Multilabel per titik
-                    primary_color = labels_at_wl[0][2] if len(labels_at_wl) == 1 else (128, 128, 128)
-
-                    # Marker
+                if best_elem:
+                    # Add scatter at peak
                     scatter = pg.ScatterPlotItem(
                         [wl], [intensity],
-                        pen=pg.mkPen(color=primary_color, width=2),
-                        brush=pg.mkBrush(*primary_color),
-                        size=10,  # Lebih kecil untuk banyak titik
+                        pen=pg.mkPen(color=best_color, width=2),
+                        brush=pg.mkBrush(*best_color),
+                        size=12,
                         symbol='o'
                     )
                     self.detail_plot_widget.addItem(scatter)
 
-                    # Label
-                    label_parts = [f"{elem}:{prob:.1%}" for elem, prob, _ in labels_at_wl]
-                    text_label = "\n".join(label_parts) + f"\n{wl:.1f}nm"
-
+                    # Add label
+                    text_label = f"{best_elem}:{best_prob:.1%}\n{wl:.1f}nm"
                     text = pg.TextItem(
                         text=text_label,
-                        color=primary_color,
-                        anchor=(0.5, 1.3),
-                        border=pg.mkPen(color=primary_color, width=1),
+                        color=best_color,
+                        anchor=(0.5, 1.5),
+                        border=pg.mkPen(color=best_color, width=1),
                         fill=pg.mkBrush(0, 0, 0, 150)
                     )
                     text.setPos(wl, intensity)
                     self.detail_plot_widget.addItem(text)
 
-                    # Vertical line (opsional, mungkin skip untuk banyak titik)
-                    # vline = pg.InfiniteLine(pos=wl, angle=90, pen=pg.mkPen(color=primary_color, width=1, style=QtCore.Qt.PenStyle.DotLine))
-                    # self.detail_plot_widget.addItem(vline)
-
-                    all_labels.append(f"@{wl:.1f}nm: {', '.join([elem for elem, _, _ in labels_at_wl])}")
+                    all_labels.append(f"@{wl:.1f}nm: {best_elem}")
 
             # Setup detail plot
             self.detail_plot_widget.setLabel('left', 'Intensity', **{'font-size': '10pt'})
             self.detail_plot_widget.setLabel('bottom', 'Wavelength (nm)', **{'font-size': '10pt'})
             self.detail_plot_widget.setTitle(
-                f'Detail View ({wl_start:.1f} - {wl_end:.1f} nm) - {len(all_labels)} detections',
+                f'Detail View ({wl_start:.1f} - {wl_end:.1f} nm) - {len(all_labels)} peaks labeled',
                 **{'font-size': '11pt'}
             )
             self.detail_plot_widget.showGrid(x=True, y=True, alpha=0.3)
@@ -788,37 +803,66 @@ class MainWindow(QtWidgets.QMainWindow):
             # Plot the spectrum region
             ax.plot(wl_region, spectrum_region, color='black', linewidth=1.0)
 
-            # Get detection threshold
+            # Get detection threshold and peak parameters
             try:
                 detection_threshold = float(self.threshold_input.text())
+                min_height = float(self.min_height_input.text())
+                min_width = float(self.min_width_input.text())
+                max_peaks = int(self.max_peaks_input.text())
+                prominence = float(self.prominence_input.text())
+                min_distance = float(self.min_distance_input.text())
             except ValueError:
                 detection_threshold = 0.4
+                min_height = 0.1
+                min_width = 1
+                max_peaks = 3
+                prominence = 0.05
+                min_distance = 5
 
-            # Add detected elements annotations
+            # Detect peaks in the spectrum region
+            peaks, properties = signal.find_peaks(
+                spectrum_region,
+                height=min_height,
+                width=min_width,
+                prominence=prominence,
+                distance=min_distance
+            )
+
+            # Limit to max_peaks
+            if len(peaks) > max_peaks:
+                sorted_peaks = sorted(zip(peaks, properties['prominences']), key=lambda x: x[1], reverse=True)[:max_peaks]
+                peaks = [p[0] for p in sorted_peaks]
+
+            # Add detected elements annotations at peaks
             colors = [
                 (255, 0, 0), (255, 102, 0), (255, 170, 0), (255, 215, 0), (0, 255, 0),
                 (0, 255, 255), (0, 136, 255), (0, 0, 255), (136, 0, 255), (255, 0, 255)
             ]
 
-            element_annotations = []
-            for idx in range(len(wl_region)):
-                wl = wl_region[idx]
-                intensity = spectrum_region[idx]
-                labels_at_wl = []
-                for elem, global_prob in self.detected_elements[:10]:  # Limit to 10 elements
-                    elem_idx = self.element_names.index(elem)
-                    prob = spatial_pred_region[idx, elem_idx]
-                    if prob > detection_threshold:
-                        labels_at_wl.append((elem, prob, colors[self.element_names.index(elem) % len(colors)]))
+            for peak_idx in peaks:
+                wl = wl_region[peak_idx]
+                intensity = spectrum_region[peak_idx]
 
-                if labels_at_wl:
-                    # Use primary color for scatter
-                    primary_color = labels_at_wl[0][2]
-                    ax.scatter(wl, intensity, color=np.array(primary_color)/255, s=60, zorder=5, edgecolors='black', linewidth=0.5)
+                # Find the element with highest probability around this peak
+                best_elem = None
+                best_prob = 0
+                best_color = None
+                start_idx = max(0, peak_idx - 5)
+                end_idx = min(len(spatial_pred_region), peak_idx + 6)
+                for elem, global_prob in self.detected_elements[:10]:
+                    elem_idx = self.element_names.index(elem)
+                    prob_region = spatial_pred_region[start_idx:end_idx, elem_idx]
+                    max_prob = np.max(prob_region)
+                    if max_prob > best_prob and max_prob > detection_threshold:
+                        best_prob = max_prob
+                        best_elem = elem
+                        best_color = colors[elem_idx % len(colors)]
+
+                if best_elem:
+                    ax.scatter(wl, intensity, color=np.array(best_color)/255, s=60, zorder=5, edgecolors='black', linewidth=0.5)
 
                     # Create annotation text
-                    label_parts = [f"{elem}:{prob:.1%}" for elem, prob, _ in labels_at_wl]
-                    text_label = "\n".join(label_parts) + f"\n{wl:.1f}nm"
+                    text_label = f"{best_elem}:{best_prob:.1%}\n{wl:.1f}nm"
 
                     # Position annotation above the point
                     ax.annotate(text_label,
@@ -832,8 +876,6 @@ class MainWindow(QtWidgets.QMainWindow):
             # Customize plot for publication
             ax.set_xlabel('Wavelength (nm)', fontsize=14, fontweight='bold')
             ax.set_ylabel('Normalized Intensity', fontsize=14, fontweight='bold')
-            ax.set_title(f'Spectroscopic Analysis - Detail View ({wl_start:.1f} - {wl_end:.1f} nm)',
-                        fontsize=16, fontweight='bold', pad=20)
             ax.grid(True, alpha=0.3)
             ax.tick_params(axis='both', which='major', labelsize=12)
             ax.set_xlim(wl_start, wl_end)
