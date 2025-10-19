@@ -5,6 +5,8 @@ import torch.nn as nn
 import math
 import json
 import numpy as np
+from scipy.sparse import diags
+from scipy.sparse.linalg import spsolve
 
 # Konfigurasi arsitektur model
 MODEL_CONFIG = {
@@ -64,20 +66,18 @@ class InformerModel(nn.Module):
         self.embedding = nn.Linear(kwargs["input_dim"], self.d_model)
         self.pos_encoding = PositionalEncoding(self.d_model, kwargs["seq_length"])
         
-        # --- PERBAIKAN DI SINI ---
-        # Secara eksplisit memberikan hanya argumen yang dibutuhkan oleh EncoderLayer.
-        # Ini akan menyelesaikan TypeError yang Anda lihat.
+        # PERBAIKAN: Secara eksplisit memberikan argumen yang dibutuhkan EncoderLayer
         self.encoder_layers = nn.ModuleList([
             EncoderLayer(
-                d_model=self.d_model,
+                d_model=kwargs["d_model"],
                 nhead=kwargs["nhead"],
                 dim_feedforward=kwargs["dim_feedforward"],
                 dropout=kwargs["dropout"],
                 attn_factor=kwargs["attn_factor"]
             ) for _ in range(kwargs["num_encoder_layers"])
         ])
-        # --- AKHIR PERBAIKAN ---
-        
+
+        # Decoder untuk setiap timestep
         self.decoder = nn.Linear(self.d_model, kwargs["num_classes"])
 
     def forward(self, x):
@@ -85,10 +85,15 @@ class InformerModel(nn.Module):
         x = self.pos_encoding(x)
         for layer in self.encoder_layers: 
             x = layer(x)
-        return self.decoder(x)
-import numpy as np
-from scipy.sparse import csc_matrix, eye, diags
-from scipy.sparse.linalg import spsolve
+
+        # Output untuk setiap timestep (B, L, num_classes)
+        x = self.decoder(x)
+
+        # Global max pooling: ambil nilai maksimum untuk setiap class di sepanjang sequence
+        # Ini masuk akal karena jika elemen ada, akan ada peak/sinyal kuat di beberapa wavelength
+        x = torch.max(x, dim=1)[0]  # (B, num_classes)
+
+        return torch.sigmoid(x)
 
 def als_baseline_correction(y, lam, p, niter=10):
     """
@@ -117,6 +122,7 @@ def als_baseline_correction(y, lam, p, niter=10):
     D = diags([1, -2, 1], [0, -1, -2], shape=(L, L - 2))
     D = lam * D.dot(D.transpose())  # Precompute D.T * D
     w = np.ones(L)
+    baseline = np.zeros(L)
     for i in range(niter):
         W = diags(w, 0)
         Z = W + D
@@ -130,7 +136,7 @@ def load_assets():
     
     model = InformerModel(**MODEL_CONFIG)
     state_dict = torch.load("assets/informer_multilabel_model.pth", map_location='cpu')
-    # Remove '_orig_mod.' prefix if it exists (common with torch.compile)
+    # Remove '_orig_mod.' prefix if it exists
     new_state_dict = {}
     for k, v in state_dict.items():
         if k.startswith('_orig_mod.'):
@@ -148,3 +154,30 @@ def load_assets():
         
     print("Aset berhasil dimuat.")
     return model, element_map, target_wavelengths
+
+def predict_with_spatial_info(model, spectrum):
+    """
+    Prediksi dengan informasi spasial per-wavelength.
+
+    Returns:
+        global_pred: (num_classes,) - prediksi global untuk setiap elemen
+        spatial_pred: (seq_length, num_classes) - prediksi untuk setiap wavelength
+    """
+    import torch
+
+    input_tensor = torch.tensor(spectrum, dtype=torch.float32).unsqueeze(0).unsqueeze(-1)
+
+    with torch.no_grad():
+        # Forward pass
+        x = model.embedding(input_tensor) * math.sqrt(model.d_model)
+        x = model.pos_encoding(x)
+        for layer in model.encoder_layers:
+            x = layer(x)
+
+        # Prediksi per timestep (sebelum pooling)
+        spatial_pred = torch.sigmoid(model.decoder(x))  # (1, L, num_classes)
+
+        # Prediksi global (setelah max pooling)
+        global_pred = torch.max(spatial_pred, dim=1)[0]  # (1, num_classes)
+
+    return global_pred.cpu().numpy().flatten(), spatial_pred.squeeze(0).cpu().numpy()

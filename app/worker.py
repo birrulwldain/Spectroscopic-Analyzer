@@ -74,13 +74,35 @@ class InformerModel(nn.Module):
         self.d_model = kwargs["d_model"]
         self.embedding = nn.Linear(kwargs["input_dim"], self.d_model)
         self.pos_encoding = PositionalEncoding(self.d_model, kwargs["seq_length"])
-        self.encoder_layers = nn.ModuleList([EncoderLayer(**kwargs) for _ in range(kwargs["num_encoder_layers"])])
+
+        # PERBAIKAN: Secara eksplisit memberikan argumen yang dibutuhkan EncoderLayer
+        self.encoder_layers = nn.ModuleList([
+            EncoderLayer(
+                d_model=kwargs["d_model"],
+                nhead=kwargs["nhead"],
+                dim_feedforward=kwargs["dim_feedforward"],
+                dropout=kwargs["dropout"],
+                attn_factor=kwargs["attn_factor"]
+            ) for _ in range(kwargs["num_encoder_layers"])
+        ])
+
+        # Decoder untuk setiap timestep
         self.decoder = nn.Linear(self.d_model, kwargs["num_classes"])
+
     def forward(self, x):
         x = self.embedding(x) * math.sqrt(self.d_model)
         x = self.pos_encoding(x)
-        for layer in self.encoder_layers: x = layer(x)
-        return self.decoder(x)
+        for layer in self.encoder_layers:
+            x = layer(x)
+
+        # Output untuk setiap timestep (B, L, num_classes)
+        x = self.decoder(x)
+
+        # Global max pooling: ambil nilai maksimum untuk setiap class di sepanjang sequence
+        # Ini masuk akal karena jika elemen ada, akan ada peak/sinyal kuat di beberapa wavelength
+        x = torch.max(x, dim=1)[0]  # (B, num_classes)
+
+        return torch.sigmoid(x)
 
 # =============================================================================
 # BAGIAN 2: INISIALISASI SAAT STARTUP WORKER
@@ -95,15 +117,24 @@ MODEL_CONFIG = {
 TARGET_MAX_INTENSITY = 0.8
 
 # Aset-aset ini secara otomatis disediakan oleh Cloudflare berdasarkan file wrangler.toml
-model = InformerModel(**MODEL_CONFIG)
-model.load_state_dict(torch.load(MODEL_ASSET, map_location='cpu'))
-model.eval()
+try:
+    model = InformerModel(**MODEL_CONFIG)
+    model.load_state_dict(torch.load("assets/informer_multilabel_model.pth", map_location='cpu'))
+    model.eval()
 
-element_map = json.loads(ELEMENT_MAP_ASSET)
-class_names = list(element_map.keys())
-target_wavelengths = np.array(json.loads(WAVELENGTH_GRID_ASSET), dtype=np.float32)
+    with open("assets/element-map-18a.json", 'r') as f:
+        element_map = json.load(f)
+    class_names = list(element_map.keys())
+    with open("assets/wavelengths_grid.json", 'r') as f:
+        target_wavelengths = np.array(json.load(f), dtype=np.float32)
 
-print("Worker initialized successfully with model and assets.")
+    print("Worker initialized successfully with model and assets.")
+except Exception as e:
+    print(f"Failed to load assets: {e}")
+    model = None
+    element_map = {}
+    class_names = []
+    target_wavelengths = np.array([])
 
 # =============================================================================
 # BAGIAN 3: FUNGSI-FUNGSI LOGIKA
@@ -213,7 +244,15 @@ class Handler:
     def response(self, body, status=200, headers={}):
         """Fungsi helper untuk membuat objek Response."""
         # Impor Response di sini untuk kompatibilitas lingkungan worker
-        from pyodide.http import Response
+        try:
+            from pyodide.http import Response
+        except ImportError:
+            # Fallback for standard Python
+            class Response:
+                def __init__(self, body, status=200, headers={}):
+                    self.body = body
+                    self.status = status
+                    self.headers = headers
         return Response(body, status=status, headers=headers)
 
 # Objek 'handler' ini yang akan diekspor dan dipanggil oleh Cloudflare
