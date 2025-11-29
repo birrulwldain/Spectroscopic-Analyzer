@@ -1,0 +1,31 @@
+cff-version: 1.2.0
+title: Spectroscopic Analyzer
+type: software
+authors:
+  - family-names: Nurdin
+    given-names: Birrulwaldi
+    orcid: "https://orcid.org/0000-0000-0000-0000"
+description: >-
+  AI-powered Laser-Induced Breakdown Spectroscopy (LIBS) analysis software
+  with interactive visualization and publication-ready export capabilities.
+keywords:
+  - LIBS
+  - Spectroscopy
+  - Deep Learning
+  - Element Detection
+  - Python
+license: MIT
+repository-code: "https://github.com/yourusername/spectroscopic-analyzer"
+version: 1.0.0
+date-released: 2025-11-29
+preferred-citation:
+  type: software
+  authors:
+    - family-names: Nurdin
+      given-names: Birrulwaldi
+  title: "Spectroscopic Analyzer: AI-Powered LIBS Analysis Software"
+  year: 2025
+  version: 1.0.0
+  repository-code: "https://github.com/yourusername/spectroscopic-analyzer"
+  url: "https://github.com/yourusername/spectroscopic-analyzer"
+

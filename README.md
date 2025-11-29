@@ -1,188 +1,330 @@
-# Spectroscopic-Analyzer
-## Bump.sh Documentation Setup (End-to-End)
+# Spectroscopic Analyzer
+## AI-Powered Laser-Induced Breakdown Spectroscopy (LIBS) Analysis
 
-This project includes a minimal OpenAPI spec and a CI workflow to publish documentation to Bump.sh.
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Python 3.9+](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/downloads/)
+[![PySide6](https://img.shields.io/badge/UI-PySide6-green.svg)](https://www.qt.io/qt-for-python)
 
-### What you need to provide
+---
 
-- Bump.sh account and access to org/workspace (e.g., `panglateh`).
-- A Bump API token (generate at bump.sh → Account → Personal access tokens).
-- A documentation slug, e.g., `spectroscopic-analyzer`.
+## Overview
 
-### Files added
+**Spectroscopic Analyzer** is a scientific software tool for automated elemental analysis using Laser-Induced Breakdown Spectroscopy (LIBS). The application combines deep learning-based element detection with interactive visualization and publication-ready export functionality.
 
-- `docs/openapi.yaml`: Minimal OpenAPI 3.0 spec (placeholder endpoints). Replace with your real API later.
-- `.github/workflows/bump-publish.yml`: GitHub Actions workflow to publish docs on pushes to `main`.
+### Key Features
 
-### Set up GitHub secret
+✨ **Automated Element Detection** — AI-powered identification of 18+ elements from spectral peaks using a multilabel Informer neural network  
+📊 **Interactive Analysis** — Drag-to-select wavelength regions and inspect detailed spectral features in real-time  
+🔬 **Scientific Rigor** — Baseline correction (Asymmetric Least Squares), peak detection, and statistical validation  
+💾 **Batch Processing** — Process entire folders of spectra with saved parameter presets  
+🎨 **Publication-Ready Plots** — Export high-resolution figures (300 DPI) with customizable labels  
+⚙️ **Cross-Platform** — Windows, macOS, and Linux support via Python and Qt
 
-Add the secret in your repository settings:
+---
 
-- Name: `BUMP_TOKEN`
-- Value: your Bump.sh API token
+## Quick Start
 
-### How publishing works
-
-- On every push to `main` that touches `docs/openapi.yaml`, the workflow deploys to Bump.sh.
-- You can also run it manually from the Actions tab (workflow_dispatch) and override:
-  - `doc_slug` (default `spectroscopic-analyzer`)
-  - `hub_slug` if you use a Hub
-
-### Local validation (optional)
-
-If you want to test locally using the CLI:
+### Installation
 
 ```bash
-npm i -g @bump.sh/cli
-export BUMP_TOKEN=your_token_here
-bump deploy docs/openapi.yaml --doc spectroscopic-analyzer --public
+# Clone the repository
+git clone https://github.com/yourusername/spectroscopic-analyzer.git
+cd spectroscopic-analyzer
+
+# Create virtual environment (recommended)
+python -m venv .venv
+source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+
+# Install dependencies
+pip install -r requirements.txt
 ```
 
-### Customize
+### Running the Application
 
-- Replace placeholder server URL, paths, and schemas in `docs/openapi.yaml`.
-- If you want private docs, remove `--public` in the workflow and configure visibility in Bump.
-- If you use Hubs, set `hub_slug` in the manual run or hardcode `--hub your-hub`.
-
-# Spectroscopic-Analyzer
-
-Dokumentasi ringkas untuk memahami struktur proyek, komponen utama, dan cara menjalankan aplikasi.
-
-## Cara Menjalankan
-
-```zsh
-# (Opsional) buat dan aktifkan virtualenv
-# python -m venv .venv
-# source .venv/bin/activate
-
-pip install -r requirements.txt
+```bash
 python app/main.py
 ```
 
-## Struktur Proyek
+The GUI will open with four main panels:
+- **Upper Left**: Full spectrum visualization with drag-select region
+- **Upper Right**: Detailed view of selected region with element labels
+- **Lower Left**: Parameter control and batch operations
+- **Lower Right**: Analysis results and element detection table
 
-- `Dockerfile` — build image untuk deployment
-- `fly.toml` — konfigurasi Fly.io
-- `requirements.txt` — dependensi Python
-- `app/` — kode sumber aplikasi
-  - `main.py` — entrypoint GUI (membuka Qt `MainWindow`)
-  - `model.py` — definisi model dan loader aset (PTH + JSON)
-  - `processing.py` — utilitas preprocessing file ASC
-  - `core/`
-    - `analysis.py` — pipeline analisis end-to-end (parsing, baseline, smoothing, normalisasi, deteksi puncak, pemetaan elemen, validasi, Abel)
-  - `ui/`
-    - `main_window.py` — logika utama GUI (I/O file, parameter, plotting, ekspor)
-    - `worker.py` — worker analisis di thread terpisah (slot `run_preview`/`run_full`, emit `previewFinished`/`fullAnalysisFinished`)
-    - `control_panel.py` — panel kontrol kiri terpadu (unggah file, parameter, tombol Pratinjau/Prediksi/Validasi, overlay/ekspor)
-    - `results_panel.py` — panel hasil kanan (plot utama, plot zoom tersinkron via region, plot radial, tabel hasil)
-    - `panels/` — komponen UI legacy (mungkin tidak lagi dipakai)
-      - `left_panel.py` — versi lama panel kiri
-      - `results_panel.py` — versi lama panel kanan
-  - `worker.py` — implementasi pipeline model alternatif/legacy (tidak dipakai UI saat ini)
-- `assets/` — aset model dan peta elemen
-  - `informer_multilabel_model.pth` — bobot model
-  - `element-map-18a.json` — peta elemen terhadap grid panjang gelombang
-  - `wavelengths_grid.json` — grid panjang gelombang target
-- `example-asc/` — contoh file ASC untuk uji cepat
+### Basic Workflow
 
-## Komponen & Fungsi Utama
+1. **Load Data**: "📂 Load Folder" or "📄 Load File" to select `.asc` spectroscopic data
+2. **Preprocess**: "🔧 Preprocess" to normalize and apply baseline correction
+3. **Predict**: "🤖 Predict" to run element detection
+4. **Inspect**: Drag on main plot to zoom into regions of interest
+5. **Export**: "📊 Export Scientific Plot" for publication-ready figures
 
-- `app/core/analysis.py`
-  - `run_full_analysis(input_data) -> dict` — menerima input dari UI (termasuk `asc_content`, parameter, dan `analysis_mode`), menghasilkan hasil analisis:
-    - `preprocess`: sinyal terproses + puncak tanpa anotasi/tabel
-    - `predict/validate`: anotasi puncak, tabel prediksi/validasi, metrik, opsi profil radial (Abel)
+---
 
-- `app/model.py`
-  - `InformerModel` dan layer pendukung (PyTorch)
-  - `als_baseline_correction(y, lam, p, niter)` — koreksi baseline ALS
-  - `load_assets()` — memuat model dan file JSON aset
+## Project Structure
 
-- `app/processing.py`
-  - `prepare_asc_data(asc_content_string) -> np.ndarray` — parsing ASC ke array
+```
+spectroscopic-analyzer/
+├── app/                            # Application source code
+│   ├── main.py                     # Entry point (launches GUI)
+│   ├── model.py                    # Deep learning model (PyTorch)
+│   ├── processing.py               # Data preprocessing utilities
+│   ├── core/
+│   │   └── analysis.py             # Complete analysis pipeline
+│   └── ui/
+│       ├── main_window.py          # Main GUI window
+│       ├── control_panel.py        # Parameter controls
+│       ├── results_panel.py        # Results visualization
+│       ├── batch_dialog.py         # Batch processing dialog
+│       └── worker.py               # Background processing threads
+├── assets/                         # Model and data assets
+│   ├── informer_multilabel_model.pth
+│   ├── element-map-18a.json
+│   └── wavelengths_grid.json
+├── example-asc/                    # Example LIBS spectroscopic data files
+├── tests/                          # Unit tests
+├── docs/
+│   ├── ARCHITECTURE.md             # Technical architecture
+│   ├── API.md                      # Python API reference
+│   └── openapi.yaml                # REST API spec (if deployed)
+├── README.md                       # This file
+├── CONTRIBUTING.md                 # Contribution guidelines
+├── TROUBLESHOOTING.md              # Common issues and solutions
+├── LICENSE                         # MIT License
+├── requirements.txt                # Python dependencies
+└── Dockerfile                      # Container image
+```
 
-- `app/ui/main_window.py`
-  - `MainWindow(QMainWindow)` — mengelola alur UI + worker:
-    - Aksi: `start_preprocess`, `start_prediction`, `start_validation`
-    - Input: `get_input_data`
-    - Hasil: `update_results`, `export_results_to_xlsx`
-    - Interaksi: zoom/crosshair/overlay, debounce slider
+---
 
-- `app/ui/worker.py`
-  - `Worker(QObject)` — menyediakan dua jalur eksekusi:
-    - `run_preview` → emit `previewFinished` (pra-pemrosesan cepat untuk pratinjau)
-    - `run_full` → emit `fullAnalysisFinished` (prediksi/validasi penuh)
+## Documentation
 
-- `app/ui/control_panel.py`
-  - `ControlPanel(QWidget)` — panel kontrol kiri terpadu dengan sinyal `previewRequested` dan `analysisRequested`.
+### User Guide
+- **Installation & Setup**: See [Quick Start](#quick-start) section
+- **Parameter Reference**: [docs/PARAMETERS.md](docs/PARAMETERS.md)
+- **Troubleshooting**: [TROUBLESHOOTING.md](TROUBLESHOOTING.md)
+- **Example Workflows**: [docs/EXAMPLES.md](docs/EXAMPLES.md)
 
-- `app/ui/results_panel.py`
-  - `ResultsPanel(QWidget)` — plot utama + zoom (LinearRegionItem), plot radial, dan tabel hasil.
+### Developer Guide
+- **Architecture Overview**: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
+- **Python API Reference**: [docs/API.md](docs/API.md)
+- **Contributing**: [CONTRIBUTING.md](CONTRIBUTING.md)
+- **Development Setup**: [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md)
 
-## Alur Kerja Singkat
+---
 
-1. Pengguna memilih file ASC dan mengatur parameter di panel kiri.
-2. `MainWindow` mengirim:
-  - `previewRequested` ke `Worker.run_preview` untuk pratinjau cepat (pra-pemrosesan saja)
-  - `analyzeRequested` ke `Worker.run_full` untuk prediksi/validasi penuh
-3. `Worker` menjalankan analisis sesuai mode dan mengembalikan hasil melalui sinyal `previewFinished` / `fullAnalysisFinished`.
-4. `ResultsPanel.update_preview` / `update_full_results` menggambar plot/tabel sesuai mode dan opsi yang dipilih.
+## Core Components
 
-## Catatan
+### Analysis Pipeline (`app/core/analysis.py`)
 
-- Jika aset tidak tersedia, pemetaan elemen mungkin terbatas; preprocessing tetap berjalan.
-- Abel inversion membutuhkan `PyAbel` (opsional).
+```python
+result = run_full_analysis(input_data)
+```
 
+Main function that processes spectroscopic data through:
+- **Parsing**: Read ASC (ASCII) format spectral data
+- **Preprocessing**: Baseline correction using Asymmetric Least Squares (ALS)
+- **Peak Detection**: Automatic peak identification with configurable thresholds
+- **Element Assignment**: Map peaks to elements using learned wavelength mapping
+- **Validation**: Statistical metrics and confidence scores
+- **Abel Deconvolution** (optional): For cylindrical sample geometry
 
+**Key Parameters:**
+- `baseline_lambda`: Smoothness parameter for ALS baseline (default: 1e5)
+- `target_max_intensity`: Normalization target (default: 0.8)
+- `peak_height`: Minimum peak height (default: 0.01)
+- `peak_prominence`: Minimum peak prominence (default: 0.01)
+- `max_peaks`: Maximum peaks to detect (default: 50)
 
-Tentu. Ini adalah ide yang sangat baik untuk menstrukturkan semua ide kita ke dalam sebuah roadmap yang jelas.
-Berikut adalah draf Rencana Pengembangan (Roadmap) dalam format Markdown. Ini bisa Anda simpan sebagai file ROADMAP.md di dalam proyek Anda dan bisa menjadi panduan untuk sprint pengembangan selanjutnya, baik untuk Anda maupun untuk memandu Copilot.
-Roadmap Pengembangan Aplikasi Spektroskopi
-Dokumen ini menguraikan target pengembangan untuk mengubah aplikasi dari prototipe analisis menjadi perangkat lunak ilmiah yang matang dan produktif. Pengembangan dibagi menjadi beberapa sprint, masing-masing dengan tujuan yang jelas.
-Sprint 1: Peningkatan Produktivitas & Pengalaman Pengguna (UX)
-Tujuan Sprint: Meningkatkan efisiensi kerja pengguna secara drastis dan memberikan fondasi untuk fitur yang lebih kompleks dengan memungkinkan manajemen data dan parameter yang lebih baik.
-Fitur 1: Batch Processing (Pemrosesan Massal)
-Sebagai seorang peneliti, saya ingin dapat memilih satu folder berisi banyak file .asc dan memproses semuanya secara otomatis, sehingga saya tidak perlu menganalisis file satu per satu.
-Tugas Implementasi (Perintah untuk Copilot):
-Buat QDialog baru yang memungkinkan pengguna memilih folder input dan folder output.
-Buat fungsi yang memindai semua file .asc di folder input.
-Untuk setiap file, jalankan fungsi run_full_analysis di background thread.
-Kumpulkan hasil utama (misalnya, daftar elemen yang terdeteksi per file) ke dalam satu DataFrame pandas.
-Setelah semua selesai, tampilkan tabel ringkasan di UI dan simpan DataFrame tersebut sebagai satu file Excel ringkasan di folder output.
-Fitur 2: Preset Parameter
-Sebagai seorang analis, saya ingin bisa menyimpan dan memuat satu set lengkap pengaturan parameter, sehingga saya bisa dengan cepat beralih antara konfigurasi untuk jenis sampel yang berbeda (misalnya, "Analisis Baja" vs. "Analisis Tanah").
-Tugas Implementasi (Perintah untuk Copilot):
-Tambahkan dua QPushButton di panel kontrol: "Simpan Preset" dan "Muat Preset".
-Fungsi "Simpan Preset" akan memanggil get_input_data untuk mengumpulkan semua nilai parameter, lalu menggunakan QFileDialog untuk menyimpannya sebagai file JSON.
-Fungsi "Muat Preset" akan membuka file JSON dan mengisi kembali semua nilai QLineEdit, QCheckBox, dll., di UI.
-Sprint 2: Kedalaman Analisis & Validasi Ilmiah
-Tujuan Sprint: Memperkaya analisis dengan data referensi eksternal dan kemampuan dekonvolusi puncak, meningkatkan kepercayaan pada hasil.
-Fitur 1: Integrasi Database Spektral (NIST)
-Sebagai seorang ilmuwan, saya ingin bisa menampilkan garis-garis emisi referensi dari database NIST di atas spektrum saya, sehingga saya bisa secara visual memvalidasi puncak yang diidentifikasi oleh model AI.
-Tugas Implementasi (Perintah untuk Copilot):
-Buat parser sederhana untuk membaca file data LIBS dari NIST (yang sudah di-format sebagai CSV). Data ini akan berisi (nama_elemen, panjang_gelombang).
-Di panel kontrol, tambahkan QComboBox yang diisi dengan semua elemen unik dari database.
-Saat pengguna memilih elemen dari ComboBox, gambar pg.InfiniteLine vertikal di plot untuk setiap panjang gelombang referensi elemen tersebut.
-Buat mekanisme untuk menghapus atau menyembunyikan garis referensi ini.
-Fitur 2: Peak Fitting & Deconvolution
-Sebagai seorang spektroskopis, saya ingin bisa memilih area dengan puncak yang tumpang tindih dan memecahnya menjadi beberapa puncak individual (Gaussian/Lorentzian), sehingga saya bisa menganalisis setiap kontribusi secara terpisah.
-Tugas Implementasi (Perintah untuk Copilot):
-Gunakan LinearRegionItem yang sudah ada. Saat sebuah region dipilih, tambahkan tombol "Fit Puncak di Region".
-Saat tombol ditekan, ambil data di dalam region tersebut.
-Gunakan scipy.optimize.curve_fit untuk mencocokkan (fit) satu atau beberapa fungsi profil puncak (misalnya, jumlah dari beberapa fungsi Gaussian) ke data.
-Tampilkan kurva hasil fitting dan puncak-puncak individual yang terdekonvolusi di plot zoom.
-Sprint 3: Analisis Kuantitatif & Pelaporan Profesional
-Tujuan Sprint: Mengembangkan kemampuan aplikasi dari kualitatif ("apa") menjadi kuantitatif ("berapa banyak") dan menghasilkan laporan yang siap dipublikasikan.
-Fitur 1: Analisis Kuantitatif (Kemometrik)
-Sebagai seorang analis industri, saya ingin membangun model kalibrasi dari sampel standar untuk memprediksi konsentrasi elemen dalam sampel yang tidak diketahui, sehingga saya bisa melakukan kontrol kualitas.
-Tugas Implementasi (Perintah untuk Copilot):
-Ini adalah fitur besar yang memerlukan mode baru di aplikasi.
-Buat UI baru untuk "Manajemen Kalibrasi" di mana pengguna bisa memuat beberapa file .asc dan memasukkan konsentrasi yang diketahui untuk setiap sampel.
-Gunakan scikit-learn untuk membangun model regresi (misalnya PLSRegression) dari data spektral dan konsentrasi.
-Setelah model dibuat, pengguna bisa memuat sampel baru, dan aplikasi akan menggunakan model tersebut untuk memprediksi dan menampilkan konsentrasinya.
-Fitur 2: Generator Laporan (PDF/HTML)
-Sebagai seorang manajer lab, saya ingin menghasilkan laporan satu halaman yang ringkas dalam format PDF untuk setiap analisis, sehingga saya bisa dengan mudah mengarsipkan dan membagikan hasilnya.
-Tugas Implementasi (Perintah untuk Copilot):
-Tambahkan tombol "Buat Laporan PDF".
-Saat ditekan, kumpulkan semua hasil saat ini: gambar dari plot utama, tabel hasil, dan metrik kuantitatif.
-Gunakan library seperti ReportLab atau fpdf2 untuk menyusun informasi ini secara terstruktur di dalam sebuah file PDF.
-Buka dialog "Simpan File" untuk menyimpan PDF yang dihasilkan.
+### Neural Network Model (`app/model.py`)
+
+- **Architecture**: Multilabel Informer network (PyTorch)
+- **Input**: Normalized spectral data (interpolated to 18000+ wavelength points)
+- **Output**: 18 element probabilities (0-1 confidence scores)
+- **Training Data**: LIBS spectra from diverse elemental standards
+
+**Key Functions:**
+```python
+model = load_model()  # Load pretrained weights
+pred = model(spectrum)  # Predict elements [batch, 18]
+baseline = als_baseline_correction(spectrum, lam=1e5, p=0.001, niter=10)
+```
+
+### Data Processing (`app/processing.py`)
+
+```python
+normalized_spectrum = prepare_asc_data(
+    asc_content_string,
+    target_wavelengths,
+    target_max_intensity=0.8,
+    als_lambda=1e5,
+    als_p=0.001,
+    als_max_iter=10
+)
+```
+
+---
+
+## Data Formats
+
+### Input: ASC (ASCII Spectroscopy) Files
+
+Standard two-column format (space-separated):
+
+```
+# Wavelength (nm)    Intensity (counts)
+250.5               1234
+251.2               5678
+252.1               9234
+...
+750.0               2341
+```
+
+### Output Files
+
+**CSV/Excel Results:**
+- Element names and probabilities
+- Peak positions and intensities
+- Spectral metrics (SNR, baseline deviation, etc.)
+- Timestamps and parameter log
+
+**Exported Figures (PNG):**
+- 300 DPI resolution (publication-ready)
+- Element labels at detected peak positions
+- Wavelength range specification in filename
+- PDF vector format available on request
+
+---
+
+## System Requirements
+
+### Minimum
+- **OS**: Windows 10+, macOS 10.14+, Linux (Ubuntu 18.04+)
+- **Python**: 3.9+
+- **RAM**: 4 GB
+- **Disk**: 2 GB (including model weights)
+
+### Recommended
+- **RAM**: 8+ GB
+- **GPU**: NVIDIA CUDA 11.0+ (optional, for faster inference)
+- **Storage**: SSD for better file I/O
+
+### Python Dependencies
+- PyTorch 2.0+
+- PySide6 (Qt6 bindings)
+- PyQtGraph (scientific visualization)
+- NumPy, SciPy, Pandas
+- PyAbel (optional, for deconvolution)
+
+See [requirements.txt](requirements.txt) for complete versions.
+
+---
+
+## Citation & Publication
+
+If you use Spectroscopic Analyzer in your research, please cite:
+
+```bibtex
+@software{spectroscopic_analyzer_2025,
+  author = {Birrulwaldi Nurdin},
+  title = {Spectroscopic Analyzer: AI-Powered LIBS Analysis Software},
+  year = {2025},
+  url = {https://github.com/yourusername/spectroscopic-analyzer},
+  note = {v1.0.0}
+}
+```
+
+### References
+
+Key papers and resources:
+
+1. **Informer Architecture**: Zhouxianghui et al. (2020). "Informer: Beyond Efficient Transformer for Long Sequence Time-Series Forecasting." arXiv:2012.07436
+
+2. **Baseline Correction**: Eilers & Boelens (2005). "Baseline correction with asymmetric least squares smoothing." Technical report, Leiden University.
+
+3. **LIBS Analysis**: Cremers & Radziemski (2006). Handbook of Laser-Induced Breakdown Spectroscopy.
+
+4. **Abel Deconvolution**: Dribinski et al. (2015). "The Velocity Map Imaging technique." Rev. Sci. Instrum. 86, 033103.
+
+---
+
+## Troubleshooting
+
+### Application crashes on startup
+```
+AttributeError: 'MainWindow' object has no attribute 'X'
+```
+**Solution:** Clear cache and reinstall
+```bash
+find . -type d -name __pycache__ -exec rm -rf {} +
+rm -rf .venv
+python -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+```
+
+### CUDA/GPU not detected
+Application runs on CPU by default. For GPU acceleration:
+```bash
+pip install torch --index-url https://download.pytorch.org/whl/cu118
+```
+
+### Import errors
+```bash
+# Verify virtual environment
+which python
+python -c "import torch, PySide6, pyqtgraph; print('OK')"
+```
+
+For detailed help, see [TROUBLESHOOTING.md](TROUBLESHOOTING.md) or open an [Issue](../../issues).
+
+---
+
+## Contributing
+
+Contributions are welcome! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for:
+- Code style and quality standards
+- Testing requirements
+- Pull request process
+- Issue reporting guidelines
+
+---
+
+## License
+
+This project is licensed under the **MIT License** — see [LICENSE](LICENSE) for details.
+
+Redistribution and use in source and binary forms permitted with attribution.
+
+---
+
+## Roadmap
+
+See [ROADMAP.md](ROADMAP.md) for planned features:
+- Sprint 1: Batch processing & parameter presets
+- Sprint 2: NIST database integration & peak fitting
+- Sprint 3: Quantitative analysis & PDF reporting
+
+---
+
+## Contact & Support
+
+- **Issues & Bugs**: [GitHub Issues](../../issues)
+- **Discussions & Ideas**: [GitHub Discussions](../../discussions)
+- **Email**: birrulwaldi@example.com
+
+---
+
+## Acknowledgments
+
+- Deep learning model based on Informer architecture
+- Baseline correction via Asymmetric Least Squares method
+- Abel deconvolution via [PyAbel](https://github.com/PyAbel/PyAbel)
+- Qt framework via [PySide6](https://wiki.qt.io/Qt_for_Python)
+
+---
+
+**Last Updated**: November 29, 2025  
+**Version**: 1.0.0-beta  
+**Status**: Active development
+
