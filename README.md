@@ -242,7 +242,7 @@ See [ROADMAP.md](ROADMAP.md) for planned features:
 
 - **Issues & Bugs**: [GitHub Issues](../../issues)
 - **Discussions & Ideas**: [GitHub Discussions](../../discussions)
-- **Email**: birrulwaldi@example.com
+- **Email**: birrul@mhs.usk.ac.id
 
 ---
 
