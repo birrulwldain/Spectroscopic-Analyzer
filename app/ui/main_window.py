@@ -26,7 +26,8 @@ class MainWindow(QtWidgets.QMainWindow):
         left_top_layout = QtWidgets.QVBoxLayout(left_top_panel)
         left_top_layout.setContentsMargins(0, 0, 0, 0)
 
-        left_top_label = QtWidgets.QLabel("📊 Full Spectrum - Drag Region Selector")
+        # Top-left: full spectrum label
+        left_top_label = QtWidgets.QLabel("Full Spectrum - Drag Region Selector")
         left_top_label.setStyleSheet("font-weight: bold; padding: 5px; background-color: #4a90e2; color: white;")
         left_top_layout.addWidget(left_top_label)
 
@@ -44,11 +45,13 @@ class MainWindow(QtWidgets.QMainWindow):
         # Header dengan tombol ekspor
         right_top_header_layout = QtWidgets.QHBoxLayout()
 
-        right_top_label = QtWidgets.QLabel("🔍 Preview: Element Labels (Selected Region)")
+        # Top-right: preview label
+        right_top_label = QtWidgets.QLabel("Preview: Element Labels (Selected Region)")
         right_top_label.setStyleSheet("font-weight: bold; padding: 5px; background-color: #50c878; color: white;")
         right_top_header_layout.addWidget(right_top_label, 1)
 
-        btn_export_plot = QtWidgets.QPushButton("📊 Export Scientific Plot")
+        # Export publication-quality plot
+        btn_export_plot = QtWidgets.QPushButton("Export Scientific Plot")
         btn_export_plot.setStyleSheet("font-weight: bold; padding: 3px 8px; background-color: #FFD700; color: black;")
         btn_export_plot.setToolTip("Export the current plot as a publication-ready scientific figure")
         right_top_header_layout.addWidget(btn_export_plot)
@@ -67,7 +70,7 @@ class MainWindow(QtWidgets.QMainWindow):
         left_bottom_layout.setContentsMargins(0, 0, 0, 0)
 
         # Header
-        param_header = QtWidgets.QLabel("⚙️ Control Panel & Parameters")
+        param_header = QtWidgets.QLabel("Control Panel & Parameters")
         param_header.setStyleSheet("font-weight: bold; padding: 5px; background-color: #ff6b6b; color: white;")
         left_bottom_layout.addWidget(param_header)
 
@@ -80,15 +83,15 @@ class MainWindow(QtWidgets.QMainWindow):
         param_container_layout = QtWidgets.QVBoxLayout(param_container)
 
         # File operations group
-        file_group = QtWidgets.QGroupBox("📁 File Operations")
+        file_group = QtWidgets.QGroupBox("File Operations")
         file_group.setStyleSheet("QGroupBox { font-weight: bold; }")
         file_layout = QtWidgets.QVBoxLayout(file_group)
-        btn_load_folder = QtWidgets.QPushButton("📂 Load Folder")
-        btn_load = QtWidgets.QPushButton("📄 Load File")
-        btn_save = QtWidgets.QPushButton("💾 Save")
-        btn_export = QtWidgets.QPushButton("📤 Export")
-        btn_preprocess = QtWidgets.QPushButton("🔧 Preprocess")
-        btn_predict = QtWidgets.QPushButton("🤖 Predict")
+        btn_load_folder = QtWidgets.QPushButton("Load Folder")
+        btn_load = QtWidgets.QPushButton("Load File")
+        btn_save = QtWidgets.QPushButton("Save")
+        btn_export = QtWidgets.QPushButton("Export")
+        btn_preprocess = QtWidgets.QPushButton("Preprocess")
+        btn_predict = QtWidgets.QPushButton("Predict")
 
         for btn in [btn_load_folder, btn_load, btn_save, btn_export, btn_preprocess, btn_predict]:
             btn.setMinimumHeight(35)
@@ -102,7 +105,7 @@ class MainWindow(QtWidgets.QMainWindow):
         param_container_layout.addWidget(file_group)
 
         # Baseline Correction group
-        baseline_group = QtWidgets.QGroupBox("📈 Baseline Correction (ALS)")
+        baseline_group = QtWidgets.QGroupBox("Baseline Correction (ALS)")
         baseline_group.setStyleSheet("QGroupBox { font-weight: bold; }")
         baseline_layout = QtWidgets.QVBoxLayout(baseline_group)
 
@@ -133,7 +136,7 @@ class MainWindow(QtWidgets.QMainWindow):
         param_container_layout.addWidget(baseline_group)
 
         # Prediction Parameters group
-        prediction_group = QtWidgets.QGroupBox("🤖 Prediction Parameters")
+        prediction_group = QtWidgets.QGroupBox("Prediction Parameters")
         prediction_group.setStyleSheet("QGroupBox { font-weight: bold; }")
         prediction_layout = QtWidgets.QVBoxLayout(prediction_group)
 
@@ -183,7 +186,7 @@ class MainWindow(QtWidgets.QMainWindow):
         param_container_layout.addWidget(prediction_group)
 
         # Wavelength Range group
-        wavelength_group = QtWidgets.QGroupBox("🌊 Wavelength Range")
+        wavelength_group = QtWidgets.QGroupBox("Wavelength Range")
         wavelength_group.setStyleSheet("QGroupBox { font-weight: bold; }")
         wavelength_layout = QtWidgets.QVBoxLayout(wavelength_group)
 
@@ -222,12 +225,12 @@ class MainWindow(QtWidgets.QMainWindow):
         right_bottom_layout.setContentsMargins(0, 0, 0, 0)
 
         # Header
-        file_log_header = QtWidgets.QLabel("📋 Files & Log")
+        file_log_header = QtWidgets.QLabel("Files & Log")
         file_log_header.setStyleSheet("font-weight: bold; padding: 5px; background-color: #9b59b6; color: white;")
         right_bottom_layout.addWidget(file_log_header)
 
         # File list table
-        file_group_bottom = QtWidgets.QGroupBox("📂 Loaded Files")
+        file_group_bottom = QtWidgets.QGroupBox("Loaded Files")
         file_group_bottom.setStyleSheet("QGroupBox { font-weight: bold; }")
         file_table_layout = QtWidgets.QVBoxLayout(file_group_bottom)
 
@@ -240,7 +243,7 @@ class MainWindow(QtWidgets.QMainWindow):
         right_bottom_layout.addWidget(file_group_bottom, stretch=1)
 
         # Log panel
-        log_group = QtWidgets.QGroupBox("📝 Activity Log")
+        log_group = QtWidgets.QGroupBox("Activity Log")
         log_group.setStyleSheet("QGroupBox { font-weight: bold; }")
         log_layout = QtWidgets.QVBoxLayout(log_group)
 
