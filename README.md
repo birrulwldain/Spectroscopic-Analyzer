@@ -29,8 +29,8 @@ The work presents an Informer-based deep learning model for qualitative multi-el
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/spectroscopic-analyzer.git
-cd spectroscopic-analyzer
+git clone https://github.com/birrulwaldain/informer-libs-multielement.git
+cd informer-libs-multielement
 
 # Create virtual environment (recommended)
 python -m venv .venv
