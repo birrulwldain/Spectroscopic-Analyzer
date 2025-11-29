@@ -62,6 +62,41 @@ The GUI will open with four main panels:
 
 ---
 
+## Training & HPC Pipeline (Reproducibility)
+
+The full training and evaluation workflow used in the paper is implemented via the scripts in the `scripts/` directory. These scripts are **not required** to run the GUI, but are provided for reproducibility and for users who want to retrain or extend the model.
+
+### Core Scripts (Training & Evaluation)
+
+- `scripts/train.py`  
+  Training pipeline for the Informer-based multi-element LIBS classifier. It loads pre-generated synthetic LIBS spectra (Saha–Boltzmann based), trains a 2-layer Informer encoder (default configuration as reported in the paper), and saves model checkpoints.
+
+- `scripts/eval.py`  
+  Evaluation pipeline for a trained model. It loads a trained checkpoint, runs inference on the evaluation split, and computes multi-label metrics such as accuracy, Hamming loss, and F1-score. This script is used to derive the **per-element precision/recall/F1 table** (Table `perf_detail` in the paper). Results can be further exported (e.g. to CSV/Excel) from this script.
+
+- `scripts/check.py`  
+  Dataset integrity checker for the HDF5 datasets used for training and evaluation. It verifies that all expected elements and splits are present and that tensor shapes are consistent. This script is useful when preparing or debugging large synthetic datasets.
+
+### HPC-Oriented Scripts (Mahameru / Cluster BRIN)
+
+The following scripts were written for running large-scale synthetic data generation and training on a GPU cluster (e.g. BRIN's Mahameru cluster). They may require adaptation of paths and scheduler directives on other systems.
+
+- `scripts/planner.py`  
+  Job planner for HPC runs. Generates a list of simulation or training jobs (e.g. combinations of plasma parameters, compositions, noise levels) to be dispatched to the cluster scheduler.
+
+- `scripts/job.py`  
+  Per-node worker script intended to run on each HPC node. It consumes a planned job configuration, generates or processes LIBS spectra for that job, and writes partial results (e.g. HDF5 shards).
+
+- `scripts/merge.py`  
+  Merge utility for combining multiple HDF5 shards produced by `job.py` into a single consolidated dataset file (with `train/`, `validation/`, and `test` splits). This merged dataset is then used as input to `scripts/train.py`.
+
+- `scripts/map.py` and `scripts/conv.py`  
+  Helper scripts for mapping, conversion, or reshaping datasets and labels between different intermediate formats. These are mainly internal research tools; they are **not required** to reproduce the main results of the paper, but are useful when regenerating datasets from raw simulation outputs.
+
+> **Note:** The HPC scripts (`planner.py`, `job.py`, `merge.py`) were originally tailored to a specific cluster environment and may contain assumptions about file system layout, job scheduling, or data locations. When porting them to a different cluster, adapt the scheduler directives and paths accordingly.
+
+---
+
 ## Repository Structure
 
 ```
@@ -219,4 +254,3 @@ See [ROADMAP.md](ROADMAP.md) for planned features:
 **Last Updated**: November 29, 2025  
 **Version**: 1.0.0-beta  
 **Status**: Active development
-
