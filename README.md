@@ -1,24 +1,25 @@
-# Spectroscopic Analyzer
-## AI-Powered Laser-Induced Breakdown Spectroscopy (LIBS) Analysis
+# Informer-Based LIBS for Qualitative Multi-Element Analysis of an Aceh Traditional Herbal Medicine
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Python 3.9+](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/downloads/)
-[![PySide6](https://img.shields.io/badge/UI-PySide6-green.svg)](https://www.qt.io/qt-for-python)
+[![Status: In Press](https://img.shields.io/badge/Status-In%20Press-blue.svg)]()
 
 ---
 
 ## Overview
 
-**Spectroscopic Analyzer** is a scientific software tool for automated elemental analysis using Laser-Induced Breakdown Spectroscopy (LIBS). The application combines deep learning-based element detection with interactive visualization and publication-ready export functionality.
+This repository contains the implementation and experimental data accompanying the paper **"Informer-Based LIBS for Qualitative Multi-Element Analysis of an Aceh Traditional Herbal Medicine"** (to appear in *IOP Conference Series: Earth and Environmental Science*, AIC 2025). 
+
+The work presents an Informer-based deep learning model for qualitative multi-element analysis via Laser-Induced Breakdown Spectroscopy (LIBS). The model is trained on physics-based synthetic spectra generated using the Saha–Boltzmann equation and evaluated on an experimental case study of Aceh traditional women's medicine. The implementation includes training and inference scripts, as well as an interactive GUI for spectroscopic data analysis.
 
 ### Key Features
 
-✨ **Automated Element Detection** — AI-powered identification of 18+ elements from spectral peaks using a multilabel Informer neural network  
-📊 **Interactive Analysis** — Drag-to-select wavelength regions and inspect detailed spectral features in real-time  
-🔬 **Scientific Rigor** — Baseline correction (Asymmetric Least Squares), peak detection, and statistical validation  
-💾 **Batch Processing** — Process entire folders of spectra with saved parameter presets  
-🎨 **Publication-Ready Plots** — Export high-resolution figures (300 DPI) with customizable labels  
-⚙️ **Cross-Platform** — Windows, macOS, and Linux support via Python and Qt
+🔬 **Physics-Based Synthetic Spectral Library** — Training spectra generated via Saha–Boltzmann plasma theory for robust multi-element representation  
+🤖 **Informer Encoder Architecture** — 2-layer ProbSparse attention mechanism for efficient processing of 4096-channel high-resolution spectra  
+🎯 **Multi-Label Classification** — Simultaneous detection of 17 elements + background class from a single LIBS spectrum  
+🌿 **Experimental Case Study** — Qualitative analysis of Aceh traditional women's medicine samples  
+📊 **Reproducible Workflow** — Complete scripts for model training, evaluation, and inference with documented hyperparameters  
+💻 **Interactive GUI** — PySide6-based graphical interface for real-time spectral visualization and element identification
 
 ---
 
@@ -61,192 +62,83 @@ The GUI will open with four main panels:
 
 ---
 
-## Project Structure
+## Repository Structure
 
 ```
-spectroscopic-analyzer/
+informer-libs-aceh/
 ├── app/                            # Application source code
-│   ├── main.py                     # Entry point (launches GUI)
-│   ├── model.py                    # Deep learning model (PyTorch)
-│   ├── processing.py               # Data preprocessing utilities
+│   ├── main.py                     # GUI application entry point
+│   ├── model.py                    # Informer model and utility functions
+│   ├── processing.py               # Spectral data preprocessing
 │   ├── core/
 │   │   └── analysis.py             # Complete analysis pipeline
-│   └── ui/
-│       ├── main_window.py          # Main GUI window
-│       ├── control_panel.py        # Parameter controls
-│       ├── results_panel.py        # Results visualization
-│       ├── batch_dialog.py         # Batch processing dialog
-│       └── worker.py               # Background processing threads
-├── assets/                         # Model and data assets
-│   ├── informer_multilabel_model.pth
-│   ├── element-map-18a.json
-│   └── wavelengths_grid.json
-├── example-asc/                    # Example LIBS spectroscopic data files
+│   └── ui/                         # GUI components (PySide6)
+│       ├── main_window.py          # Main application window
+│       └── ...
+├── assets/                         # Model weights and reference data
+│   ├── informer_multilabel_model.pth    # Pretrained model weights
+│   ├── element-map-17.json              # Element-wavelength mapping
+│   └── wavelengths_grid.json            # Target wavelength grid (4096 channels)
+├── data/                           # Experimental and synthetic data
+│   ├── synthetic/                  # Training data (Saha–Boltzmann spectra)
+│   └── experimental/               # Case study measurements
+├── models/                         # Saved checkpoints and model definitions
+├── notebooks/                      # Jupyter notebooks for analysis
+├── training/                       # Training scripts
+├── scripts/                        # Utility and inference scripts
 ├── tests/                          # Unit tests
-├── docs/
-│   ├── ARCHITECTURE.md             # Technical architecture
-│   ├── API.md                      # Python API reference
-│   └── openapi.yaml                # REST API spec (if deployed)
-├── README.md                       # This file
-├── CONTRIBUTING.md                 # Contribution guidelines
-├── TROUBLESHOOTING.md              # Common issues and solutions
-├── LICENSE                         # MIT License
+├── docs/                           # Technical documentation
+│   ├── ARCHITECTURE.md
+│   └── ...
 ├── requirements.txt                # Python dependencies
-└── Dockerfile                      # Container image
+├── setup.py                        # Package setup
+├── README.md                       # This file
+├── LICENSE                         # MIT License
+└── CITATION.cff                    # Citation metadata
 ```
 
 ---
 
-## Documentation
+## How to Cite
 
-### User Guide
-- **Installation & Setup**: See [Quick Start](#quick-start) section
-- **Parameter Reference**: [docs/PARAMETERS.md](docs/PARAMETERS.md)
-- **Troubleshooting**: [TROUBLESHOOTING.md](TROUBLESHOOTING.md)
-- **Example Workflows**: [docs/EXAMPLES.md](docs/EXAMPLES.md)
+If you use this code or data in your research, please cite the accompanying paper:
 
-### Developer Guide
-- **Architecture Overview**: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
-- **Python API Reference**: [docs/API.md](docs/API.md)
-- **Contributing**: [CONTRIBUTING.md](CONTRIBUTING.md)
-- **Development Setup**: [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md)
+### Human-Readable Citation
 
----
+Walidain, B., Idris, N., Saddami, K., Yuzza, N., & Mitaphonna, R. (2025). Informer-Based LIBS for Qualitative Multi-Element Analysis of an Aceh Traditional Herbal Medicine. *IOP Conference Series: Earth and Environmental Science*, AIC 2025. doi: to be assigned
 
-## Core Components
+### BibTeX
 
-### Analysis Pipeline (`app/core/analysis.py`)
-
-```python
-result = run_full_analysis(input_data)
-```
-
-Main function that processes spectroscopic data through:
-- **Parsing**: Read ASC (ASCII) format spectral data
-- **Preprocessing**: Baseline correction using Asymmetric Least Squares (ALS)
-- **Peak Detection**: Automatic peak identification with configurable thresholds
-- **Element Assignment**: Map peaks to elements using learned wavelength mapping
-- **Validation**: Statistical metrics and confidence scores
-- **Abel Deconvolution** (optional): For cylindrical sample geometry
-
-**Key Parameters:**
-- `baseline_lambda`: Smoothness parameter for ALS baseline (default: 1e5)
-- `target_max_intensity`: Normalization target (default: 0.8)
-- `peak_height`: Minimum peak height (default: 0.01)
-- `peak_prominence`: Minimum peak prominence (default: 0.01)
-- `max_peaks`: Maximum peaks to detect (default: 50)
-
-### Neural Network Model (`app/model.py`)
-
-- **Architecture**: Multilabel Informer network (PyTorch)
-- **Input**: Normalized spectral data (interpolated to 18000+ wavelength points)
-- **Output**: 18 element probabilities (0-1 confidence scores)
-- **Training Data**: LIBS spectra from diverse elemental standards
-
-**Key Functions:**
-```python
-model = load_model()  # Load pretrained weights
-pred = model(spectrum)  # Predict elements [batch, 18]
-baseline = als_baseline_correction(spectrum, lam=1e5, p=0.001, niter=10)
-```
-
-### Data Processing (`app/processing.py`)
-
-```python
-normalized_spectrum = prepare_asc_data(
-    asc_content_string,
-    target_wavelengths,
-    target_max_intensity=0.8,
-    als_lambda=1e5,
-    als_p=0.001,
-    als_max_iter=10
-)
+```bibtex
+@inproceedings{Walidain2025,
+  title={Informer-Based LIBS for Qualitative Multi-Element Analysis of an Aceh Traditional Herbal Medicine},
+  author={Walidain, Birrul and Idris, Nasrullah and Saddami, Khairun and Yuzza, Natasya and Mitaphonna, Rara},
+  booktitle={AIC 2025 -- Natural Life and Sciences track},
+  journal={IOP Conference Series: Earth and Environmental Science},
+  year={2025},
+  doi = {to be assigned},
+  note={in press}
+}
 ```
 
 ---
 
-## Data Formats
+## Contact
 
-### Input: ASC (ASCII Spectroscopy) Files
+**Corresponding Author:**
+- **Name**: Nasrullah Idris
+- **Email**: [nasrullah.idris@usk.ac.id](mailto:nasrullah.idris@usk.ac.id)
+- **Affiliation**: Department of Physics, Faculty of Mathematics and Natural Sciences, Universitas Syiah Kuala, Banda Aceh 23111, Indonesia
 
-Standard two-column format (space-separated):
-
-```
-# Wavelength (nm)    Intensity (counts)
-250.5               1234
-251.2               5678
-252.1               9234
-...
-750.0               2341
-```
-
-### Output Files
-
-**CSV/Excel Results:**
-- Element names and probabilities
-- Peak positions and intensities
-- Spectral metrics (SNR, baseline deviation, etc.)
-- Timestamps and parameter log
-
-**Exported Figures (PNG):**
-- 300 DPI resolution (publication-ready)
-- Element labels at detected peak positions
-- Wavelength range specification in filename
-- PDF vector format available on request
-
----
-
-## System Requirements
-
-### Minimum
-- **OS**: Windows 10+, macOS 10.14+, Linux (Ubuntu 18.04+)
-- **Python**: 3.9+
-- **RAM**: 4 GB
-- **Disk**: 2 GB (including model weights)
-
-### Recommended
-- **RAM**: 8+ GB
-- **GPU**: NVIDIA CUDA 11.0+ (optional, for faster inference)
-- **Storage**: SSD for better file I/O
-
-### Python Dependencies
-- PyTorch 2.0+
-- PySide6 (Qt6 bindings)
-- PyQtGraph (scientific visualization)
-- NumPy, SciPy, Pandas
-- PyAbel (optional, for deconvolution)
-
-See [requirements.txt](requirements.txt) for complete versions.
+**GitHub Maintainer:**
+- **Name**: Birrul Walidain
+- **Repository**: [github.com/birrulwaldain/informer-libs-aceh](https://github.com/birrulwaldain/informer-libs-aceh)
 
 ---
 
 ## Citation & Publication
 
-If you use Spectroscopic Analyzer in your research, please cite:
-
-```bibtex
-@software{spectroscopic_analyzer_2025,
-  author = {Birrulwaldi Nurdin},
-  title = {Spectroscopic Analyzer: AI-Powered LIBS Analysis Software},
-  year = {2025},
-  url = {https://github.com/yourusername/spectroscopic-analyzer},
-  note = {v1.0.0}
-}
-```
-
-### References
-
-Key papers and resources:
-
-1. **Informer Architecture**: Zhouxianghui et al. (2020). "Informer: Beyond Efficient Transformer for Long Sequence Time-Series Forecasting." arXiv:2012.07436
-
-2. **Baseline Correction**: Eilers & Boelens (2005). "Baseline correction with asymmetric least squares smoothing." Technical report, Leiden University.
-
-3. **LIBS Analysis**: Cremers & Radziemski (2006). Handbook of Laser-Induced Breakdown Spectroscopy.
-
-4. **Abel Deconvolution**: Dribinski et al. (2015). "The Velocity Map Imaging technique." Rev. Sci. Instrum. 86, 033103.
-
----
+If you use this implementation in your research, please cite the paper above. The BibTeX entry will be updated with the DOI once assigned by IOP Publishing.
 
 ## Troubleshooting
 

@@ -1,3 +1,20 @@
+"""
+Informer-Based LIBS for Qualitative Multi-Element Analysis of an Aceh Traditional Herbal Medicine
+
+Interactive GUI application for spectroscopic data analysis using a deep learning model.
+
+This implementation accompanies the paper:
+    Walidain, B., Idris, N., Saddami, K., Yuzza, N., & Mitaphonna, R. (2025).
+    "Informer-Based LIBS for Qualitative Multi-Element Analysis of an Aceh Traditional Herbal Medicine."
+    IOP Conference Series: Earth and Environmental Science, AIC 2025. (in press)
+
+Authors:
+    Birrul Walidain, Nasrullah Idris, Khairun Saddami, Natasya Yuzza, Rara Mitaphonna
+
+For more information, see:
+    - README.md: Installation and usage instructions
+    - GitHub: https://github.com/birrulwaldain/informer-libs-aceh
+"""
 from __future__ import annotations
 import os
 import sys

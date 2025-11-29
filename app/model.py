@@ -1,3 +1,24 @@
+"""
+Neural network models for Informer-Based LIBS analysis.
+
+This module implements the Informer architecture for multi-element classification
+from laser-induced breakdown spectroscopy (LIBS) data.
+
+Paper Reference:
+    Walidain, B., Idris, N., Saddami, K., Yuzza, N., & Mitaphonna, R. (2025).
+    "Informer-Based LIBS for Qualitative Multi-Element Analysis of an Aceh Traditional Herbal Medicine."
+    IOP Conference Series: Earth and Environmental Science, AIC 2025. (in press)
+
+Informer Architecture Reference:
+    Zhou, H., Zhang, S., Peng, J., et al. (2021).
+    "Informer: Beyond Efficient Transformer for Long Sequence Time-Series Forecasting."
+    ICLR 2021. arXiv:2012.07436
+
+See Also:
+    - GitHub: https://github.com/birrulwaldain/informer-libs-aceh
+    - README: Installation and usage instructions
+"""
+
 # app/model.py
 
 import torch

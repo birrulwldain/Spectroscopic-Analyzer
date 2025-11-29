@@ -1,31 +1,56 @@
 cff-version: 1.2.0
-title: Spectroscopic Analyzer
+title: Informer-Based LIBS for Qualitative Multi-Element Analysis of an Aceh Traditional Herbal Medicine
 type: software
 authors:
-  - family-names: Nurdin
-    given-names: Birrulwaldi
-    orcid: "https://orcid.org/0000-0000-0000-0000"
+  - family-names: Walidain
+    given-names: Birrul
+  - family-names: Idris
+    given-names: Nasrullah
+  - family-names: Saddami
+    given-names: Khairun
+  - family-names: Yuzza
+    given-names: Natasya
+  - family-names: Mitaphonna
+    given-names: Rara
 description: >-
-  AI-powered Laser-Induced Breakdown Spectroscopy (LIBS) analysis software
-  with interactive visualization and publication-ready export capabilities.
+  Implementation and experimental data for an Informer-based deep learning model
+  for qualitative multi-element analysis via Laser-Induced Breakdown Spectroscopy (LIBS).
+  The model is trained on physics-based synthetic spectra generated using the Saha–Boltzmann
+  equation and evaluated on Aceh traditional herbal medicine samples.
 keywords:
   - LIBS
-  - Spectroscopy
+  - Laser-Induced Breakdown Spectroscopy
+  - Informer
   - Deep Learning
-  - Element Detection
-  - Python
+  - Multi-element Analysis
+  - Aceh Traditional Medicine
+  - Saha-Boltzmann
+  - ProbSparse Attention
 license: MIT
-repository-code: "https://github.com/yourusername/spectroscopic-analyzer"
+repository-code: "https://github.com/birrulwaldain/informer-libs-aceh"
 version: 1.0.0
 date-released: 2025-11-29
+
 preferred-citation:
-  type: software
+  type: conference-paper
   authors:
-    - family-names: Nurdin
-      given-names: Birrulwaldi
-  title: "Spectroscopic Analyzer: AI-Powered LIBS Analysis Software"
+    - family-names: Walidain
+      given-names: Birrul
+    - family-names: Idris
+      given-names: Nasrullah
+    - family-names: Saddami
+      given-names: Khairun
+    - family-names: Yuzza
+      given-names: Natasya
+    - family-names: Mitaphonna
+      given-names: Rara
+  title: "Informer-Based LIBS for Qualitative Multi-Element Analysis of an Aceh Traditional Herbal Medicine"
+  journal: "IOP Conference Series: Earth and Environmental Science"
+  conference:
+    name: "AIC 2025 – Natural Life and Sciences track"
   year: 2025
-  version: 1.0.0
-  repository-code: "https://github.com/yourusername/spectroscopic-analyzer"
-  url: "https://github.com/yourusername/spectroscopic-analyzer"
+  status: "in press"
+  doi: "to be assigned"
+  repository-code: "https://github.com/birrulwaldain/informer-libs-aceh"
+  url: "https://github.com/birrulwaldain/informer-libs-aceh"
 

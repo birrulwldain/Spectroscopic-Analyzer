@@ -1,3 +1,19 @@
+"""
+Data preprocessing utilities for LIBS spectroscopic analysis.
+
+Implements spectral preprocessing operations including baseline correction,
+normalization, and data loading for the Informer-based LIBS analysis pipeline.
+
+Paper Reference:
+    Walidain, B., Idris, N., Saddami, K., Yuzza, N., & Mitaphonna, R. (2025).
+    "Informer-Based LIBS for Qualitative Multi-Element Analysis of an Aceh Traditional Herbal Medicine."
+    IOP Conference Series: Earth and Environmental Science, AIC 2025. (in press)
+
+See Also:
+    - GitHub: https://github.com/birrulwaldain/informer-libs-aceh
+    - README: Installation and usage instructions
+"""
+
 # app/processing.py
 
 import pandas as pd

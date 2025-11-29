@@ -1,6 +1,11 @@
 #!/usr/bin/env python
 """
-Setup configuration for Spectroscopic Analyzer package.
+Setup configuration for Informer-Based LIBS analysis package.
+
+This package accompanies the paper:
+    Walidain, B., Idris, N., Saddami, K., Yuzza, N., & Mitaphonna, R. (2025).
+    "Informer-Based LIBS for Qualitative Multi-Element Analysis of an Aceh Traditional Herbal Medicine."
+    IOP Conference Series: Earth and Environmental Science, AIC 2025. (in press)
 """
 
 from setuptools import setup, find_packages
@@ -22,18 +27,20 @@ def read_requirements(filename):
     ]
 
 setup(
-    name="spectroscopic-analyzer",
+    name="informer-libs-aceh",
     version="1.0.0",
-    author="Birrulwaldi Nurdin",
-    author_email="birrulwaldi@example.com",
-    description="AI-powered LIBS spectroscopic analysis and element detection",
+    author="Birrul Walidain, Nasrullah Idris, Khairun Saddami, Natasya Yuzza, Rara Mitaphonna",
+    author_email="nasrullah.idris@usk.ac.id",
+    maintainer="Birrul Walidain",
+    description="Informer-based deep learning for qualitative multi-element LIBS analysis",
     long_description=long_description,
     long_description_content_type="text/markdown",
-    url="https://github.com/yourusername/spectroscopic-analyzer",
+    url="https://github.com/birrulwaldain/informer-libs-aceh",
     project_urls={
-        "Bug Tracker": "https://github.com/yourusername/spectroscopic-analyzer/issues",
-        "Documentation": "https://github.com/yourusername/spectroscopic-analyzer/docs",
-        "Source Code": "https://github.com/yourusername/spectroscopic-analyzer",
+        "Bug Tracker": "https://github.com/birrulwaldain/informer-libs-aceh/issues",
+        "Documentation": "https://github.com/birrulwaldain/informer-libs-aceh",
+        "Source Code": "https://github.com/birrulwaldain/informer-libs-aceh",
+        "Paper": "https://iopscience.iop.org/",
     },
     packages=find_packages(),
     classifiers=[
@@ -55,7 +62,7 @@ setup(
     },
     entry_points={
         "console_scripts": [
-            "spectroscopic-analyzer=app.main:main",
+            "informer-libs=app.main:main",
         ],
     },
     include_package_data=True,
@@ -67,8 +74,12 @@ setup(
     },
     keywords=[
         "LIBS",
-        "spectroscopy",
+        "Laser-Induced Breakdown Spectroscopy",
+        "Informer",
         "deep learning",
+        "multi-element analysis",
+        "Aceh traditional medicine",
+        "Saha-Boltzmann",
         "element detection",
         "scientific software",
     ],
