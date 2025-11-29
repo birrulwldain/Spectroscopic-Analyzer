@@ -87,13 +87,16 @@ The following scripts were written for running large-scale synthetic data genera
 - `scripts/job.py`  
   Per-node worker script intended to run on each HPC node. It consumes a planned job configuration, generates or processes LIBS spectra for that job, and writes partial results (e.g. HDF5 shards).
 
+- `scripts/job.sh`  
+  SLURM batch submission script used on BRIN's Mahameru cluster. It configures resources (partition, CPUs, memory, walltime), activates the appropriate Conda environment, and then calls `job.py` with a specific JSON chunk (e.g. `combinations-<suffix>-<chunk>.json`) to produce a corresponding HDF5 shard (e.g. `dataset-<suffix>-<chunk>.h5`). This script is **cluster-specific** and should be adapted (paths, `#SBATCH` directives, environment activation) for other HPC systems.
+
 - `scripts/merge.py`  
   Merge utility for combining multiple HDF5 shards produced by `job.py` into a single consolidated dataset file (with `train/`, `validation/`, and `test` splits). This merged dataset is then used as input to `scripts/train.py`.
 
 - `scripts/map.py` and `scripts/conv.py`  
   Helper scripts for mapping, conversion, or reshaping datasets and labels between different intermediate formats. These are mainly internal research tools; they are **not required** to reproduce the main results of the paper, but are useful when regenerating datasets from raw simulation outputs.
 
-> **Note:** The HPC scripts (`planner.py`, `job.py`, `merge.py`) were originally tailored to a specific cluster environment and may contain assumptions about file system layout, job scheduling, or data locations. When porting them to a different cluster, adapt the scheduler directives and paths accordingly.
+> **Note:** The HPC scripts (`planner.py`, `job.py`, `job.sh`, `merge.py`) were originally tailored to a specific cluster environment and may contain assumptions about file system layout, job scheduling, or data locations. When porting them to a different cluster, adapt the scheduler directives and paths accordingly.
 
 ---
 
