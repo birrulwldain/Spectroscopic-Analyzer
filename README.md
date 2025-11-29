@@ -241,7 +241,6 @@ See [ROADMAP.md](ROADMAP.md) for planned features:
 ## Contact & Support
 
 - **Issues & Bugs**: [GitHub Issues](../../issues)
-- **Discussions & Ideas**: [GitHub Discussions](../../discussions)
 - **Email**: birrul@mhs.usk.ac.id
 
 ---
