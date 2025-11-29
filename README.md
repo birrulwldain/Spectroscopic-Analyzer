@@ -14,12 +14,12 @@ The work presents an Informer-based deep learning model for qualitative multi-el
 
 ### Key Features
 
-🔬 **Physics-Based Synthetic Spectral Library** — Training spectra generated via Saha–Boltzmann plasma theory for robust multi-element representation  
-🤖 **Informer Encoder Architecture** — 2-layer ProbSparse attention mechanism for efficient processing of 4096-channel high-resolution spectra  
-🎯 **Multi-Label Classification** — Simultaneous detection of 17 elements + background class from a single LIBS spectrum  
-🌿 **Experimental Case Study** — Qualitative analysis of Aceh traditional women's medicine samples  
-📊 **Reproducible Workflow** — Complete scripts for model training, evaluation, and inference with documented hyperparameters  
-💻 **Interactive GUI** — PySide6-based graphical interface for real-time spectral visualization and element identification
+**Physics-Based Synthetic Spectral Library** — Training spectra generated via Saha–Boltzmann plasma theory for robust multi-element representation  
+**Informer Encoder Architecture** — 2-layer ProbSparse attention mechanism for efficient processing of 4096-channel high-resolution spectra  
+**Multi-Label Classification** — Simultaneous detection of 17 elements + background class from a single LIBS spectrum  
+**Experimental Case Study** — Qualitative analysis of Aceh traditional women's medicine samples  
+**Reproducible Workflow** — Complete scripts for model training, evaluation, and inference with documented hyperparameters  
+**Interactive GUI** — PySide6-based graphical interface for real-time spectral visualization and element identification
 
 ---
 
@@ -54,11 +54,11 @@ The GUI will open with four main panels:
 
 ### Basic Workflow
 
-1. **Load Data**: "📂 Load Folder" or "📄 Load File" to select `.asc` spectroscopic data
-2. **Preprocess**: "🔧 Preprocess" to normalize and apply baseline correction
-3. **Predict**: "🤖 Predict" to run element detection
+1. **Load Data**: "Load Folder" or "Load File" to select `.asc` spectroscopic data
+2. **Preprocess**: "Preprocess" to normalize and apply baseline correction
+3. **Predict**: "Predict" to run element detection
 4. **Inspect**: Drag on main plot to zoom into regions of interest
-5. **Export**: "📊 Export Scientific Plot" for publication-ready figures
+5. **Export**: "Export Scientific Plot" for publication-ready figures
 
 ---
 
@@ -170,7 +170,8 @@ Walidain, B., Idris, N., Saddami, K., Yuzza, N., & Mitaphonna, R. (2025). Inform
 
 **GitHub Maintainer:**
 - **Name**: Birrul Walidain
-- **Repository**: [github.com/birrulwaldain/informer-libs-aceh](https://github.com/birrulwaldain/informer-libs-aceh)
+- **Email**: [birrul@mhs.usk.ac.id](mailto:birrul@mhs.usk.ac.id)
+- **Repository**: [github.com/birrulwaldain/informer-libs-multielement](https://github.com/birrulwaldain/informer-libs-multielement)
 
 ---
 

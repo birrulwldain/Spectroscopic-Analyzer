@@ -4,6 +4,7 @@ type: software
 authors:
   - family-names: Walidain
     given-names: Birrul
+    email: birrul@mhs.usk.ac.id
   - family-names: Idris
     given-names: Nasrullah
   - family-names: Saddami

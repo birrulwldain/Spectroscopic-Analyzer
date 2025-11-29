@@ -5,7 +5,42 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "informer-libs-multielement"
 version = "1.0.0"
-...existing code...
+description = "A multi-element informer library"
+readme = "README.md"
+license = { file = "LICENSE" }
+authors = [
+    {name = "Birrul Walidain", email = "birrul@mhs.usk.ac.id"},
+    {name = "Nasrullah Idris", email = "nasrullah.idris@usk.ac.id"},
+    {name = "Khairun Saddami"},
+    {name = "Natasya Yuzza"},
+    {name = "Rara Mitaphonna"},
+]
+maintainers = [
+    {name = "Birrul Walidain", email = "birrul@mhs.usk.ac.id"},
+]
+keywords = ["informer", "multi-element", "library"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+]
+dependencies = [
+    "numpy",
+    "pandas",
+    "matplotlib",
+]
+optional-dependencies = {
+    dev = [
+        "black",
+        "flake8",
+        "mypy",
+    ],
+    docs = [
+        "sphinx",
+        "sphinx-rtd-theme",
+    ],
+}
+
 [project.urls]
 Homepage = "https://github.com/birrulwaldain/informer-libs-multielement"
 Repository = "https://github.com/birrulwaldain/informer-libs-multielement"
@@ -16,5 +51,3 @@ Paper = "https://iopscience.iop.org/"
 
 [project.scripts]
 informer-libs-multielement = "app.main:main"
-...existing code...
-
