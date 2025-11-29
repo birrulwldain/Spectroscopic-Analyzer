@@ -27,7 +27,7 @@ def read_requirements(filename):
     ]
 
 setup(
-    name="informer-libs-aceh",
+    name="informer-libs-multielement",
     version="1.0.0",
     author="Birrul Walidain, Nasrullah Idris, Khairun Saddami, Natasya Yuzza, Rara Mitaphonna",
     author_email="nasrullah.idris@usk.ac.id",
@@ -35,11 +35,11 @@ setup(
     description="Informer-based deep learning for qualitative multi-element LIBS analysis",
     long_description=long_description,
     long_description_content_type="text/markdown",
-    url="https://github.com/birrulwaldain/informer-libs-aceh",
+    url="https://github.com/birrulwaldain/informer-libs-multielement",
     project_urls={
-        "Bug Tracker": "https://github.com/birrulwaldain/informer-libs-aceh/issues",
-        "Documentation": "https://github.com/birrulwaldain/informer-libs-aceh",
-        "Source Code": "https://github.com/birrulwaldain/informer-libs-aceh",
+        "Bug Tracker": "https://github.com/birrulwaldain/informer-libs-multielement/issues",
+        "Documentation": "https://github.com/birrulwaldain/informer-libs-multielement",
+        "Source Code": "https://github.com/birrulwaldain/informer-libs-multielement",
         "Paper": "https://iopscience.iop.org/",
     },
     packages=find_packages(),
@@ -62,7 +62,7 @@ setup(
     },
     entry_points={
         "console_scripts": [
-            "informer-libs=app.main:main",
+            "informer-libs-multielement=app.main:main",
         ],
     },
     include_package_data=True,
@@ -85,4 +85,3 @@ setup(
     ],
     zip_safe=False,
 )
-

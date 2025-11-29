@@ -1,0 +1,20 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "informer-libs-multielement"
+version = "1.0.0"
+...existing code...
+[project.urls]
+Homepage = "https://github.com/birrulwaldain/informer-libs-multielement"
+Repository = "https://github.com/birrulwaldain/informer-libs-multielement"
+Documentation = "https://github.com/birrulwaldain/informer-libs-multielement"
+"Bug Tracker" = "https://github.com/birrulwaldain/informer-libs-multielement/issues"
+"Source Code" = "https://github.com/birrulwaldain/informer-libs-multielement"
+Paper = "https://iopscience.iop.org/"
+
+[project.scripts]
+informer-libs-multielement = "app.main:main"
+...existing code...
+

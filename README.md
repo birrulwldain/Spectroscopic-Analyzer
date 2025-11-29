@@ -103,7 +103,7 @@ The following scripts were written for running large-scale synthetic data genera
 ## Repository Structure
 
 ```
-informer-libs-aceh/
+informer-libs-multielement/
 ├── app/                            # Application source code
 │   ├── main.py                     # GUI application entry point
 │   ├── model.py                    # Informer model and utility functions

@@ -27,7 +27,7 @@ keywords:
   - Saha-Boltzmann
   - ProbSparse Attention
 license: MIT
-repository-code: "https://github.com/birrulwaldain/informer-libs-aceh"
+repository-code: "https://github.com/birrulwaldain/informer-libs-multielement"
 version: 1.0.0
 date-released: 2025-11-29
 
@@ -51,6 +51,5 @@ preferred-citation:
   year: 2025
   status: "in press"
   doi: "to be assigned"
-  repository-code: "https://github.com/birrulwaldain/informer-libs-aceh"
-  url: "https://github.com/birrulwaldain/informer-libs-aceh"
-
+  repository-code: "https://github.com/birrulwaldain/informer-libs-multielement"
+  url: "https://github.com/birrulwaldain/informer-libs-multielement"
