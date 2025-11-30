@@ -8,18 +8,22 @@
 
 ## Overview
 
-This repository contains the implementation and experimental data accompanying the paper **"Informer-Based LIBS for Qualitative Multi-Element Analysis of an Aceh Traditional Herbal Medicine"** (to appear in *IOP Conference Series: Earth and Environmental Science*, AIC 2025). 
+This repository contains the implementation and experimental data accompanying the paper:
 
-The work presents an Informer-based deep learning model for qualitative multi-element analysis via Laser-Induced Breakdown Spectroscopy (LIBS). The model is trained on physics-based synthetic spectra generated using the Saha–Boltzmann equation and evaluated on an experimental case study of Aceh traditional women's medicine. The implementation includes training and inference scripts, as well as an interactive GUI for spectroscopic data analysis.
+> **"Informer-Based LIBS for Qualitative Multi-Element Analysis of an Aceh Traditional Herbal Medicine"**  
+> Walidain, B., Idris, N., Saddami, K., Yuzza, N., & Mitaphonna, R. (2025)  
+> *IOP Conference Series: Earth and Environmental Science*, AIC 2025
+
+The work presents an Informer-based deep learning model for qualitative multi-element analysis via Laser-Induced Breakdown Spectroscopy (LIBS). The model is trained on physics-based synthetic spectra generated using the Saha–Boltzmann equation and evaluated on an experimental case study of Aceh traditional herbal medicine samples. The implementation includes training and inference scripts, as well as an interactive GUI for spectroscopic data analysis.
 
 ### Key Features
 
-**Physics-Based Synthetic Spectral Library** — Training spectra generated via Saha–Boltzmann plasma theory for robust multi-element representation  
-**Informer Encoder Architecture** — 2-layer ProbSparse attention mechanism for efficient processing of 4096-channel high-resolution spectra  
-**Multi-Label Classification** — Simultaneous detection of 17 elements + background class from a single LIBS spectrum  
-**Experimental Case Study** — Qualitative analysis of Aceh traditional women's medicine samples  
-**Reproducible Workflow** — Complete scripts for model training, evaluation, and inference with documented hyperparameters  
-**Interactive GUI** — PySide6-based graphical interface for real-time spectral visualization and element identification
+- **Physics-Based Synthetic Spectral Library** — Training spectra generated via Saha–Boltzmann plasma theory for robust multi-element representation
+- **Informer Encoder Architecture** — 2-layer ProbSparse attention mechanism for efficient processing of 4096-channel high-resolution spectra
+- **Multi-Label Classification** — Simultaneous detection of 17 elements + background class from a single LIBS spectrum
+- **Experimental Case Study** — Qualitative analysis of Aceh traditional herbal medicine samples
+- **Reproducible Workflow** — Complete scripts for model training, evaluation, and inference with documented hyperparameters
+- **Interactive GUI** — PySide6-based graphical interface for real-time spectral visualization and element identification
 
 ---
 
@@ -40,13 +44,13 @@ source .venv/bin/activate  # On Windows: .venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
-### Running the Application
+### Running the Interactive GUI
 
 ```bash
 python app/main.py
 ```
 
-The GUI will open with four main panels:
+The GUI displays four main panels:
 - **Upper Left**: Full spectrum visualization with drag-select region
 - **Upper Right**: Detailed view of selected region with element labels
 - **Lower Left**: Parameter control and batch operations
@@ -54,49 +58,32 @@ The GUI will open with four main panels:
 
 ### Basic Workflow
 
-1. **Load Data**: "Load Folder" or "Load File" to select `.asc` spectroscopic data
-2. **Preprocess**: "Preprocess" to normalize and apply baseline correction
-3. **Predict**: "Predict" to run element detection
+1. **Load Data**: Use "Load Folder" or "Load File" to select .asc spectroscopic data
+2. **Preprocess**: Click "Preprocess" to normalize and apply baseline correction
+3. **Predict**: Click "Predict" to run element detection
 4. **Inspect**: Drag on main plot to zoom into regions of interest
-5. **Export**: "Export Scientific Plot" for publication-ready figures
+5. **Export**: Click "Export Scientific Plot" for publication-ready figures
 
 ---
 
-## Training & HPC Pipeline (Reproducibility)
+## Reproducibility & Training
 
-The full training and evaluation workflow used in the paper is implemented via the scripts in the `scripts/` directory. These scripts are **not required** to run the GUI, but are provided for reproducibility and for users who want to retrain or extend the model.
+For step-by-step instructions on reproducing the training and evaluation results from the paper, see **[REPRODUCE.md](REPRODUCE.md)**.
 
-### Core Scripts (Training & Evaluation)
+### Core Scripts Summary
 
-- `scripts/train.py`  
-  Training pipeline for the Informer-based multi-element LIBS classifier. It loads pre-generated synthetic LIBS spectra (Saha–Boltzmann based), trains a 2-layer Informer encoder (default configuration as reported in the paper), and saves model checkpoints.
+The `scripts/` directory contains:
 
-- `scripts/eval.py`  
-  Evaluation pipeline for a trained model. It loads a trained checkpoint, runs inference on the evaluation split, and computes multi-label metrics such as accuracy, Hamming loss, and F1-score. This script is used to derive the **per-element precision/recall/F1 table** (Table `perf_detail` in the paper). Results can be further exported (e.g. to CSV/Excel) from this script.
+- **train.py** — Train the Informer model using all default hyperparameters from the paper
+- **eval.py** — Evaluate trained model and generate per-element metrics table (matching Table perf_detail in paper)
+- **check.py** — Verify dataset integrity before training
+- **planner.py, job.py, merge.py** — Generate synthetic LIBS spectra via Saha–Boltzmann equations
 
-- `scripts/check.py`  
-  Dataset integrity checker for the HDF5 datasets used for training and evaluation. It verifies that all expected elements and splits are present and that tensor shapes are consistent. This script is useful when preparing or debugging large synthetic datasets.
+For HPC cluster deployments (tested on BRIN's Mahameru cluster):
+- **job.sh** — SLURM job submission script (requires adaptation for other clusters)
+- **run.sh, run-eval.sh, job-merge.sh** — Local execution wrappers
 
-### HPC-Oriented Scripts (Mahameru / Cluster BRIN)
-
-The following scripts were written for running large-scale synthetic data generation and training on a GPU cluster (e.g. BRIN's Mahameru cluster). They may require adaptation of paths and scheduler directives on other systems.
-
-- `scripts/planner.py`  
-  Job planner for HPC runs. Generates a list of simulation or training jobs (e.g. combinations of plasma parameters, compositions, noise levels) to be dispatched to the cluster scheduler.
-
-- `scripts/job.py`  
-  Per-node worker script intended to run on each HPC node. It consumes a planned job configuration, generates or processes LIBS spectra for that job, and writes partial results (e.g. HDF5 shards).
-
-- `scripts/job.sh`  
-  SLURM batch submission script used on BRIN's Mahameru cluster. It configures resources (partition, CPUs, memory, walltime), activates the appropriate Conda environment, and then calls `job.py` with a specific JSON chunk (e.g. `combinations-<suffix>-<chunk>.json`) to produce a corresponding HDF5 shard (e.g. `dataset-<suffix>-<chunk>.h5`). This script is **cluster-specific** and should be adapted (paths, `#SBATCH` directives, environment activation) for other HPC systems.
-
-- `scripts/merge.py`  
-  Merge utility for combining multiple HDF5 shards produced by `job.py` into a single consolidated dataset file (with `train/`, `validation/`, and `test` splits). This merged dataset is then used as input to `scripts/train.py`.
-
-- `scripts/map.py` and `scripts/conv.py`  
-  Helper scripts for mapping, conversion, or reshaping datasets and labels between different intermediate formats. These are mainly internal research tools; they are **not required** to reproduce the main results of the paper, but are useful when regenerating datasets from raw simulation outputs.
-
-> **Note:** The HPC scripts (`planner.py`, `job.py`, `job.sh`, `merge.py`) were originally tailored to a specific cluster environment and may contain assumptions about file system layout, job scheduling, or data locations. When porting them to a different cluster, adapt the scheduler directives and paths accordingly.
+For complete documentation of all scripts, see **[scripts/README.md](scripts/README.md)**.
 
 ---
 
@@ -110,42 +97,83 @@ informer-libs-multielement/
 │   ├── processing.py               # Spectral data preprocessing
 │   ├── core/
 │   │   └── analysis.py             # Complete analysis pipeline
-│   └── ui/                         # GUI components (PySide6)
+│   └── ui/
 │       ├── main_window.py          # Main application window
 │       └── ...
 ├── assets/                         # Model weights and reference data
 │   ├── informer_multilabel_model.pth    # Pretrained model weights
 │   ├── element-map-17.json              # Element-wavelength mapping
 │   └── wavelengths_grid.json            # Target wavelength grid (4096 channels)
-├── data/                           # Experimental and synthetic data
-│   ├── synthetic/                  # Training data (Saha–Boltzmann spectra)
-│   └── experimental/               # Case study measurements
-├── models/                         # Saved checkpoints and model definitions
-├── notebooks/                      # Jupyter notebooks for analysis
-├── training/                       # Training scripts
-├── scripts/                        # Utility and inference scripts
-├── tests/                          # Unit tests
+├── data/                           # Training and experimental data
+│   ├── synthetic/                  # Synthetic training data (HDF5)
+│   ├── experimental/               # Real LIBS measurements (on request)
+│   └── README.md                   # Data documentation
+├── example-asc/                    # Example LIBS spectra for testing
+├── scripts/                        # Training, evaluation, and utility scripts
+│   └── README.md                   # Script documentation
 ├── docs/                           # Technical documentation
 │   ├── ARCHITECTURE.md
-│   └── ...
+│   ├── DEVELOPMENT.md
+│   ├── PARAMETERS.md
+│   └── openapi.yaml
 ├── requirements.txt                # Python dependencies
-├── setup.py                        # Package setup
-├── README.md                       # This file
+├── setup.py                        # Package setup configuration
+├── pyproject.toml                  # Modern Python packaging
+├── REPRODUCE.md                    # Complete reproducibility guide
+├── MODEL_CARD.md                   # Model documentation card
 ├── LICENSE                         # MIT License
-└── CITATION.cff                    # Citation metadata
+├── CITATION.cff                    # Citation metadata
+├── README.md                       # This file
+└── ROADMAP.md                      # Future plans and improvements
 ```
 
 ---
 
-## How to Cite
+## Data
 
-If you use this code or data in your research, please cite the accompanying paper:
+### Synthetic Training Data
 
-### Human-Readable Citation
+The model is trained on synthetic LIBS spectra generated via the Saha–Boltzmann plasma equations. Data generation uses the scripts in `scripts/` and can be reproduced from scratch.
 
-Walidain, B., Idris, N., Saddami, K., Yuzza, N., & Mitaphonna, R. (2025). Informer-Based LIBS for Qualitative Multi-Element Analysis of an Aceh Traditional Herbal Medicine. *IOP Conference Series: Earth and Environmental Science*, AIC 2025. doi: to be assigned
+**Dataset Statistics:**
+- Training: 8,000 spectra
+- Validation: 1,000 spectra
+- Test: 1,000 spectra
+- Elements: 17 + background
+- Wavelength range: 200–850 nm (4096 channels)
+- Noise levels: 1%, 2%, 5%
 
-### BibTeX
+For detailed data documentation, see **[data/README.md](data/README.md)**.
+
+### Experimental Data
+
+Real LIBS measurements from Aceh traditional herbal medicine samples are not included in the public repository due to privacy considerations. Access can be requested from the corresponding author.
+
+### Example Data
+
+Sample spectra are provided in `example-asc/` for quick testing without requiring data generation.
+
+---
+
+## Model Card
+
+For technical details about the Informer model architecture, training configuration, performance metrics, and intended use, see **[MODEL_CARD.md](MODEL_CARD.md)**.
+
+Key specifications:
+- Architecture: Informer encoder with 2 layers
+- Embedding dimension: 32
+- Feed-forward dimension: 64
+- Attention heads: 4
+- Output: Multi-label probabilities (0-1 per element)
+- Trained on: Synthetic LIBS spectra via Saha–Boltzmann equations
+
+---
+
+## Citation
+
+If you use this code, data, or model in your research, please cite the paper:
+
+### BibTeX Entry
 
 ```bibtex
 @inproceedings{Walidain2025,
@@ -154,37 +182,77 @@ Walidain, B., Idris, N., Saddami, K., Yuzza, N., & Mitaphonna, R. (2025). Inform
   booktitle={AIC 2025 -- Natural Life and Sciences track},
   journal={IOP Conference Series: Earth and Environmental Science},
   year={2025},
-  doi = {to be assigned},
   note={in press}
 }
 ```
 
+### Human-Readable Citation
+
+Walidain, B., Idris, N., Saddami, K., Yuzza, N., & Mitaphonna, R. (2025). Informer-Based LIBS for Qualitative Multi-Element Analysis of an Aceh Traditional Herbal Medicine. *IOP Conference Series: Earth and Environmental Science*, AIC 2025. (in press)
+
+See **[CITATION.cff](CITATION.cff)** for additional citation formats (CFF, RIS, Zotero).
+
 ---
 
-## Contact
+## Acknowledgments
+
+This work builds upon:
+- The **Informer architecture** from Zhou et al. (ICLR 2021)
+- **ProbSparse attention** mechanism for efficient sequence processing
+- **Saha–Boltzmann physics** for synthetic spectral generation
+- **Asymmetric Least Squares** for baseline correction
+- **PyTorch, PySide6, PyQtGraph** for the implementation stack
+
+We also acknowledge:
+- BRIN (Badan Riset dan Inovasi Nasional) for computing resources
+- Department of Physics, Universitas Syiah Kuala for experimental facilities
+
+---
+
+## Contact & Support
 
 **Corresponding Author:**
-- **Name**: Nasrullah Idris
-- **Email**: [nasrullah.idris@usk.ac.id](mailto:nasrullah.idris@usk.ac.id)
-- **Affiliation**: Department of Physics, Faculty of Mathematics and Natural Sciences, Universitas Syiah Kuala, Banda Aceh 23111, Indonesia
+- Name: Nasrullah Idris
+- Email: nasrullah.idris@usk.ac.id
+- Affiliation: Department of Physics, Faculty of Mathematics and Natural Sciences, Universitas Syiah Kuala, Banda Aceh 23111, Indonesia
 
 **GitHub Maintainer:**
-- **Name**: Birrul Walidain
-- **Email**: [birrul@mhs.usk.ac.id](mailto:birrul@mhs.usk.ac.id)
-- **Repository**: [github.com/birrulwaldain/informer-libs-multielement](https://github.com/birrulwaldain/informer-libs-multielement)
+- Name: Birrul Walidain
+- Email: birrul@mhs.usk.ac.id
+- Repository: [github.com/birrulwaldain/informer-libs-multielement](https://github.com/birrulwaldain/informer-libs-multielement)
+
+**For Issues & Questions:**
+- Open an issue: [GitHub Issues](../../issues)
+- Email: birrul@mhs.usk.ac.id
 
 ---
 
-## Citation & Publication
+## Contributing
 
-If you use this implementation in your research, please cite the paper above. The BibTeX entry will be updated with the DOI once assigned by IOP Publishing.
+Contributions are welcome. Please see **[CONTRIBUTING.md](CONTRIBUTING.md)** for:
+- Code style and quality standards
+- Testing requirements
+- Pull request process
+- Issue reporting guidelines
+
+---
+
+## License
+
+This project is licensed under the **MIT License** — see **[LICENSE](LICENSE)** for details.
+
+Redistribution and use in source and binary forms are permitted with attribution.
+
+---
 
 ## Troubleshooting
 
 ### Application crashes on startup
+
 ```
 AttributeError: 'MainWindow' object has no attribute 'X'
 ```
+
 **Solution:** Clear cache and reinstall
 ```bash
 find . -type d -name __pycache__ -exec rm -rf {} +
@@ -195,65 +263,47 @@ pip install -r requirements.txt
 ```
 
 ### CUDA/GPU not detected
-Application runs on CPU by default. For GPU acceleration:
+
+The application runs on CPU by default. For GPU acceleration:
 ```bash
 pip install torch --index-url https://download.pytorch.org/whl/cu118
 ```
 
 ### Import errors
+
 ```bash
 # Verify virtual environment
 which python
 python -c "import torch, PySide6, pyqtgraph; print('OK')"
 ```
 
-For detailed help, see [TROUBLESHOOTING.md](TROUBLESHOOTING.md) or open an [Issue](../../issues).
-
----
-
-## Contributing
-
-Contributions are welcome! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for:
-- Code style and quality standards
-- Testing requirements
-- Pull request process
-- Issue reporting guidelines
-
----
-
-## License
-
-This project is licensed under the **MIT License** — see [LICENSE](LICENSE) for details.
-
-Redistribution and use in source and binary forms permitted with attribution.
+For additional help, see **[TROUBLESHOOTING.md](TROUBLESHOOTING.md)**.
 
 ---
 
 ## Roadmap
 
-See [ROADMAP.md](ROADMAP.md) for planned features:
-- Sprint 1: Batch processing & parameter presets
-- Sprint 2: NIST database integration & peak fitting
-- Sprint 3: Quantitative analysis & PDF reporting
+See **[ROADMAP.md](ROADMAP.md)** for planned features and improvements:
+- Batch processing and parameter presets
+- NIST spectral database integration
+- Peak fitting and quantitative analysis
+- PDF report generation
 
 ---
 
-## Contact & Support
+## Related Documentation
 
-- **Issues & Bugs**: [GitHub Issues](../../issues)
-- **Email**: birrul@mhs.usk.ac.id
-
----
-
-## Acknowledgments
-
-- Deep learning model based on Informer architecture
-- Baseline correction via Asymmetric Least Squares method
-- Abel deconvolution via [PyAbel](https://github.com/PyAbel/PyAbel)
-- Qt framework via [PySide6](https://wiki.qt.io/Qt_for_Python)
+- **[REPRODUCE.md](REPRODUCE.md)** — Complete reproducibility guide
+- **[MODEL_CARD.md](MODEL_CARD.md)** — Model technical card
+- **[data/README.md](data/README.md)** — Data documentation and format
+- **[scripts/README.md](scripts/README.md)** — Script documentation
+- **[CONTRIBUTING.md](CONTRIBUTING.md)** — Contribution guidelines
+- **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)** — Application architecture
+- **[docs/PARAMETERS.md](docs/PARAMETERS.md)** — Model parameters reference
 
 ---
 
-**Last Updated**: November 29, 2025  
-**Version**: 1.0.0-beta  
-**Status**: Active development
+**Last Updated:** November 30, 2025  
+**Version:** 1.0.0  
+**Status:** Ready for Publication
+
