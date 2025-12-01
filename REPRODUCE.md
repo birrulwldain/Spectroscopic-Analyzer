@@ -233,26 +233,49 @@ After running the evaluation script, verify the results match the paper:
    - [ ] d_model = 32, d_ff = 64, n_heads = 4
    - [ ] Dropout = 0.1
    - [ ] Multi-label focal loss enabled
+   - [ ] Input shape: (batch, 4096) — spectral channels
+   - [ ] Output: 18 classes (17 elements + background)
 
-2. **Performance Metrics**
-   - [ ] Overall accuracy: ~88-92% (from paper Table 2)
-   - [ ] Weighted F1-score: ~0.89-0.91
-   - [ ] Hamming loss: ~0.08-0.12
+2. **Synthetic Dataset Configuration**
+   - [ ] Training: 35,000 spectra
+   - [ ] Validation: 7,500 spectra
+   - [ ] Test: 7,500 spectra
+   - [ ] Total: 50,000 spectra
+   - [ ] Wavelength range: 200–850 nm (4096 channels)
+   - [ ] Noise levels: 1%, 2%, 5% (Gaussian)
+   - [ ] Elements detected: Ca, C, H, K, Mg, Mn, N, Na, O, P, S, Si, Al, Fe, Cu, Zn, B + background
 
-3. **Per-Element Metrics** (Table `perf_detail`)
-   - [ ] Precision range: 0.82-0.94
-   - [ ] Recall range: 0.80-0.93
-   - [ ] F1 range: 0.81-0.93
+3. **Performance Metrics (Synthetic Test Set)**
+   - [ ] Overall accuracy: 0.899 ± 0.015 (from paper)
+   - [ ] Weighted F1-score: 0.890 ± 0.015
+   - [ ] Macro F1-score: 0.878 ± 0.018
+   - [ ] Hamming loss: 0.087 ± 0.012
 
-4. **Inference Results**
-   - [ ] Can detect 15-17 elements from test samples
+4. **Per-Element Metrics** (Table `perf_detail` in paper)
+   - [ ] Precision range: 0.82–0.94
+   - [ ] Recall range: 0.80–0.93
+   - [ ] F1 range: 0.81–0.93
+   - [ ] Best detection: H, O, Ca (F1 > 0.88)
+   - [ ] Challenging: Rare emitters (F1 ~ 0.81)
+
+5. **Experimental Validation** (Aceh Herbal Medicine Case Study)
+   - [ ] 13 herbal medicine samples analyzed
+   - [ ] 39 total measurements (3 replicates per sample)
+   - [ ] Successfully detected: Ca, Mg (minerals) and Na, Mn (trace metals)
+   - [ ] High agreement (100% precision) with conventional LIBS analysis
+   - [ ] See Figure 2 and Table 3 in paper
+
+6. **Inference Results**
+   - [ ] Can detect 15-17 elements from synthetic test samples
    - [ ] Predicted probabilities consistent with reported ranges
+   - [ ] Example files in `example-asc/` return positive predictions for expected elements
 
 If results deviate significantly, check:
-- Data preprocessing (baseline correction, normalization)
-- Model initialization (random seed)
-- Hyperparameter alignment
-- Hardware differences (CPU vs. GPU may introduce small variations)
+- Data preprocessing (baseline correction via ALS, normalization to [0,1])
+- Model initialization (set random seed for reproducibility)
+- Hyperparameter alignment (especially d_model, d_ff, n_heads, n_layers)
+- Hardware differences (CPU vs. GPU may introduce ~1-2% variation)
+- Batch size effect (results may vary slightly with batch size 16 vs. 32)
 
 ---
 

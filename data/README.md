@@ -67,17 +67,17 @@ python job.py --config combinations.json --output ../data/synthetic/dataset.h5
 ```
 dataset.h5
 ├── train/
-│   ├── spectra        (8000, 4096) float32  # Normalized intensity [0, 1]
-│   ├── labels         (8000, 18) int32      # Multi-hot encoding (17 elem + bg)
-│   ├── wavelengths    (4096,) float32       # Wavelength grid [200, 850] nm
-│   └── metadata       (HDF5 attributes)     # Plasma params, noise, etc.
+│   ├── spectra        (35000, 4096) float32  # Normalized intensity [0, 1]
+│   ├── labels         (35000, 18) int32      # Multi-hot encoding (17 elem + bg)
+│   ├── wavelengths    (4096,) float32        # Wavelength grid [200, 850] nm
+│   └── metadata       (HDF5 attributes)      # Plasma params, noise, etc.
 ├── val/
-│   ├── spectra        (1000, 4096) float32
-│   ├── labels         (1000, 18) int32
+│   ├── spectra        (7500, 4096) float32
+│   ├── labels         (7500, 18) int32
 │   └── ...
 └── test/
-    ├── spectra        (1000, 4096) float32
-    ├── labels         (1000, 18) int32
+    ├── spectra        (7500, 4096) float32
+    ├── labels         (7500, 18) int32
     └── ...
 ```
 
@@ -116,8 +116,8 @@ import numpy as np
 
 # Load dataset
 with h5py.File('data/synthetic/dataset_train.h5', 'r') as f:
-    X_train = f['train/spectra'][:]      # (8000, 4096)
-    y_train = f['train/labels'][:]       # (8000, 18)
+    X_train = f['train/spectra'][:]      # (35000, 4096)
+    y_train = f['train/labels'][:]       # (35000, 18)
     wavelengths = f['train/wavelengths'][:] # (4096,)
     
     # Access metadata
@@ -129,7 +129,7 @@ with h5py.File('data/synthetic/dataset_train.h5', 'r') as f:
 
 | Aspect | Value |
 |--------|-------|
-| **Total Samples** | 10,000 (8k train, 1k val, 1k test) |
+| **Total Samples** | 50,000 (35k train, 7.5k val, 7.5k test) |
 | **Spectra Shape** | (N, 4096) – high-resolution |
 | **Wavelength Range** | 200–850 nm (physical UV-Vis-NIR) |
 | **Wavelength Resolution** | 0.16 nm/channel |
@@ -154,40 +154,72 @@ Each spectrum has multiple elements present (multi-label):
 
 ### Primary Case Study: Aceh Herbal Medicine
 
-**Location:** `data/experimental/aceh-herbal-medicine/`  
+**Location:** `data/experimental/aceh-herbal-medicine/` (not included in public repo)  
+**Reference Paper:** Table 3 in "Informer-Based LIBS for Qualitative Multi-Element Analysis of an Aceh Traditional Herbal Medicine" (IOP EES, AIC 2025)
+
 **Samples:** 13 traditional herbal medicine preparations from Aceh, Indonesia  
-**Measurements:** 3 replicates per sample × 3 iterations = 9 spectra per sample
+**Measurements:** 3 iterations (replicates) per sample = **39 total spectra**
 
-**File Format:** `.asc` (ASCII text)
+**Results from Paper (Table 3):**
 
-**Example File:** `1_iteration_1.asc`
+| Element | Category | Informer Prediction | Conventional LIBS | Status |
+|---------|----------|---------------------|-------------------|--------|
+| C | Major organic | Below threshold | Detected | Limited sensitivity |
+| N | Major organic | Below threshold | Detected | Limited sensitivity |
+| O | Major organic | Below threshold | Detected | Limited sensitivity |
+| Ca | Minor mineral | **Positive** | Detected | ✓ Agreement |
+| Mg | Minor mineral | **Positive** | Detected | ✓ Agreement |
+| Na | Trace metal | **Positive** | Detected | ✓ Agreement |
+| Mn | Trace metal | **Positive** | Detected | ✓ Agreement |
+| Fe | Trace metal | Below threshold | Detected | Weak signal |
+
+**Key Findings:**
+- High accuracy (100% precision) on detected trace metals and minerals
+- Model successfully identified Ca, Mg, Na, Mn across all 39 measurements
+- Full agreement with conventional LIBS analysis using NIST Atomic Spectra Database (ASD)
+- Organic elements (C, N, O) require extended spectral window for improved sensitivity
+
+**Spectral Window Used:** 200–850 nm
+- Strong transition lines for Ca (393.3, 396.9 nm)
+- Mg transitions (279.5, 280.3 nm)
+- Na D-doublet (589.0, 589.6 nm)
+- Mn lines (255.9, 257.6, 259.3 nm)
+
+### ASC File Structure
+
+**File Format:** Two-column space/tab-separated ASCII  
+**Encoding:** UTF-8
+
+**Example (from `example-asc/1_iteration_1.asc`):**
 ```
 # Sample ID: 1
 # Iteration: 1
-# Timestamp: 2025-11-15 10:30:00
 # Integration Time: 10 ms
 Wavelength(nm)  Intensity(arb.u.)
 200.156         0.0234
 200.316         0.0241
+200.476         0.0198
 ...
 849.684         0.0115
 ```
 
-### ASC File Structure
-
-**Format:** Two-column space/tab-separated ASCII
-
-**Column 1:** Wavelength (nm)  
-**Column 2:** Intensity (arbitrary units, normalized to [0,1])
+**Column 1:** Wavelength in nanometers (float, typically 200–850 nm)  
+**Column 2:** Intensity in arbitrary units (float, typically 0–1 after normalization)
 
 **Metadata:** Comments (lines starting with `#`) may include:
-- Sample ID
-- Iteration number
-- Timestamp
-- Instrument settings
-- Integration time
-- Laser energy
-- Plasma temperature estimates
+- Sample ID (1–13)
+- Iteration number (1–3)
+- Timestamp (YYYY-MM-DD HH:MM:SS)
+- Integration time (ms)
+- Laser energy (mJ)
+- Plasma temperature estimates (K)
+- Distance to sample (mm)
+
+**Expected Structure:**
+- Rows: ~4000–5000 wavelength points (may vary by instrument)
+- Columns: 2 (wavelength, intensity)
+- No header row after comment block
+- Whitespace-delimited
 
 ### Data Availability & Access
 

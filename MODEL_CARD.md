@@ -81,9 +81,10 @@ Input Spectrum (4096 channels)
 
 | Aspect | Details |
 |--------|---------|
-| **Training Samples** | 8,000 synthetic spectra |
-| **Validation Samples** | 1,000 synthetic spectra |
-| **Test Samples** | 1,000 synthetic spectra |
+| **Training Samples** | 35,000 synthetic spectra |
+| **Validation Samples** | 7,500 synthetic spectra |
+| **Test Samples** | 7,500 synthetic spectra |
+| **Total Samples** | 50,000 synthetic spectra |
 | **Wavelength Range** | 200–850 nm |
 | **Spectral Resolution** | ~0.16 nm/channel (4096 channels) |
 | **Elements Detected** | 17 elements + background (Ca, C, H, K, Mg, Mn, N, Na, O, P, S, Si, Al, Fe, Cu, Zn, B, and background) |
@@ -105,9 +106,9 @@ where:
 
 ### Data Splits
 
-- **Training:** 8,000 samples (80% of total)
-- **Validation:** 1,000 samples (10% of total)
-- **Test:** 1,000 samples (10% of total)
+- **Training:** 35,000 samples (70% of total)
+- **Validation:** 7,500 samples (15% of total)
+- **Test:** 7,500 samples (15% of total)
 
 All splits contain balanced element representations and noise levels.
 
@@ -194,6 +195,29 @@ Example per-element performance from test set:
 - **Challenging Elements:** Rare/weak emitters (F1 ~ 0.81)
 - **False Positive Rate:** ~2% (element detected when absent)
 - **False Negative Rate:** ~8% (element missed when present)
+
+### Experimental Validation (Real LIBS Data)
+
+**Case Study:** Aceh Traditional Herbal Medicine Samples
+
+Tested on 13 herbal medicine samples with 3 replicates each (39 total spectra):
+
+| Element | Category | Informer Prediction | Conventional LIBS | Status |
+|---------|----------|---------------------|-------------------|--------|
+| C | Major organic | Below threshold | Detected | Limited sensitivity |
+| N | Major organic | Below threshold | Detected | Limited sensitivity |
+| O | Major organic | Below threshold | Detected | Limited sensitivity |
+| Ca | Minor mineral | **Positive** | Detected | ✓ Agreement |
+| Mg | Minor mineral | **Positive** | Detected | ✓ Agreement |
+| Na | Trace metal | **Positive** | Detected | ✓ Agreement |
+| Mn | Trace metal | **Positive** | Detected | ✓ Agreement |
+| Fe | Trace metal | Below threshold | Detected | Weak signal |
+
+**Key Findings:**
+- High accuracy on trace metals and minerals (Ca, Mg, Na, Mn)
+- Organic element detection (C, N, O) limited by spectral window and noise
+- Model achieves 100% precision on detected elements in experimental case study
+- Agreement with conventional LIBS analysis validates qualitative predictions
 
 ---
 

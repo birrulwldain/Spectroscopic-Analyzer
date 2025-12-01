@@ -21,7 +21,10 @@ The work presents an Informer-based deep learning model for qualitative multi-el
 - **Physics-Based Synthetic Spectral Library** — Training spectra generated via Saha–Boltzmann plasma theory for robust multi-element representation
 - **Informer Encoder Architecture** — 2-layer ProbSparse attention mechanism for efficient processing of 4096-channel high-resolution spectra
 - **Multi-Label Classification** — Simultaneous detection of 17 elements + background class from a single LIBS spectrum
-- **Experimental Case Study** — Qualitative analysis of Aceh traditional herbal medicine samples
+- **Experimental Case Study** — Qualitative analysis of 13 Aceh traditional herbal medicine samples (39 replicate measurements)
+  - Successfully identified trace minerals: Ca, Mg
+  - Successfully identified trace metals: Na, Mn
+  - Validated against conventional LIBS analysis with high agreement
 - **Reproducible Workflow** — Complete scripts for model training, evaluation, and inference with documented hyperparameters
 - **Interactive GUI** — PySide6-based graphical interface for real-time spectral visualization and element identification
 
@@ -136,9 +139,10 @@ informer-libs-multielement/
 The model is trained on synthetic LIBS spectra generated via the Saha–Boltzmann plasma equations. Data generation uses the scripts in `scripts/` and can be reproduced from scratch.
 
 **Dataset Statistics:**
-- Training: 8,000 spectra
-- Validation: 1,000 spectra
-- Test: 1,000 spectra
+- Training: 35,000 spectra
+- Validation: 7,500 spectra
+- Test: 7,500 spectra
+- Total: 50,000 spectra
 - Elements: 17 + background
 - Wavelength range: 200–850 nm (4096 channels)
 - Noise levels: 1%, 2%, 5%
@@ -147,11 +151,20 @@ For detailed data documentation, see **[data/README.md](data/README.md)**.
 
 ### Experimental Data
 
-Real LIBS measurements from Aceh traditional herbal medicine samples are not included in the public repository due to privacy considerations. Access can be requested from the corresponding author.
+Real LIBS measurements from Aceh traditional herbal medicine samples are evaluated in the paper. The case study focuses on:
+- **Total Samples:** 13 herbal medicine samples
+- **Measurements per Sample:** 3 iterations (replicates)
+- **Total Measurements:** 39 LIBS spectra
+- **Detected Elements** (per paper Table 3):
+  - **Major Organic:** C, N, O (below detection threshold)
+  - **Minor Mineral:** Ca, Mg (positive identification)
+  - **Trace Metals:** Na, Mn (positive identification), Fe (below threshold)
+
+These measurements are not included in the public repository due to privacy considerations. Access to the full experimental dataset can be requested from the corresponding author.
 
 ### Example Data
 
-Sample spectra are provided in `example-asc/` for quick testing without requiring data generation.
+Sample spectra are provided in `example-asc/` (13 samples × 3 iterations = 39 files) for quick testing without requiring data generation. These example files demonstrate the typical LIBS spectroscopic data format (.asc) used in the analysis pipeline.
 
 ---
 
