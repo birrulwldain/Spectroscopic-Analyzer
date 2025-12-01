@@ -18,9 +18,9 @@ The repository uses two main data types:
 ```
 data/
 ├── synthetic/                    # Generated training datasets (HDF5)
-│   ├── dataset_train.h5         # ~8,000 training spectra
-│   ├── dataset_val.h5           # ~1,000 validation spectra
-│   └── dataset_test.h5          # ~1,000 test spectra
+│   ├── dataset_train.h5         # 35,000 training spectra
+│   ├── dataset_val.h5           # 7,500 validation spectra
+│   └── dataset_test.h5          # 7,500 test spectra
 ├── experimental/                # Real LIBS measurements
 │   ├── aceh-herbal-medicine/    # Primary case study data
 │   ├── reference-materials/     # Standards for calibration
