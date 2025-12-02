@@ -9,6 +9,7 @@ import json
 import math
 from scipy.signal import find_peaks
 from io import StringIO
+from app.processing import prepare_asc_data
 
 # =============================================================================
 # BAGIAN 1: DEFINISI KELAS MODEL
@@ -140,30 +141,6 @@ except Exception as e:
 # BAGIAN 3: FUNGSI-FUNGSI LOGIKA
 # =============================================================================
 
-def prepare_asc_data(asc_content_string: str) -> np.ndarray:
-    """Memproses string konten file .asc menjadi spektrum yang siap diprediksi."""
-    df = pd.read_csv(StringIO(asc_content_string), sep=r'\s+', names=['wavelength', 'intensity'], comment='#')
-    original_wavelengths, original_spectrum = df['wavelength'].values, df['intensity'].values
-    
-    # Koreksi Baseline
-    anchor_points = np.percentile(original_spectrum, 10)
-    baseline_points = original_spectrum < anchor_points
-    if np.sum(baseline_points) > 5:
-        coeffs = np.polyfit(original_wavelengths[baseline_points], original_spectrum[baseline_points], deg=5)
-        baseline = np.polyval(coeffs, original_wavelengths)
-        spectrum_corrected = original_spectrum - baseline
-        spectrum_corrected[spectrum_corrected < 0] = 0
-    else:
-        spectrum_corrected = original_spectrum - np.min(original_spectrum)
-
-    # Normalisasi
-    max_val = np.max(spectrum_corrected)
-    processed_spectrum = (spectrum_corrected / max_val) * TARGET_MAX_INTENSITY if max_val > 0 else spectrum_corrected
-    
-    # Resampling
-    resampled_spectrum = np.interp(target_wavelengths, original_wavelengths, processed_spectrum)
-    return resampled_spectrum.astype(np.float32)
-
 # =============================================================================
 # BAGIAN 4: HANDLER UTAMA WORKER
 # Objek ini akan menangani setiap permintaan (request) yang masuk ke URL Worker Anda.
@@ -190,7 +167,7 @@ class Handler:
             asc_content = await request.text()
             
             # 2. Proses dan siapkan data
-            spectrum_data = prepare_asc_data(asc_content)
+            spectrum_data = prepare_asc_data(asc_content, target_wavelengths)
             
             # 3. Deteksi Puncak
             peak_indices, _ = find_peaks(spectrum_data, height=0.03, distance=8)
